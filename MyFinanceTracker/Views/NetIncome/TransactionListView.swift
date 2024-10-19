@@ -5,7 +5,6 @@ struct TransactionListView: View {
     let transactions: [Transaction]
 
     @Environment(\.managedObjectContext) private var viewContext
-    @State private var transactionToEdit: Transaction?
     @EnvironmentObject var netIncomeManager: NetIncomeManager
 
     var body: some View {
@@ -17,22 +16,26 @@ struct TransactionListView: View {
                     .padding()
             } else {
                 ForEach(transactions, id: \.id) { transaction in
-                    TransactionRowView(transaction: transaction, onEdit: {
-                        transactionToEdit = transaction
-                    }, onDelete: {
-                        deleteTransaction(transaction)
-                    })
-                    .listRowInsets(EdgeInsets())
-                    .padding(.vertical, 4)
+                    ZStack {
+                        NavigationLink(destination: EditTransactionView(transaction: transaction)
+                                        .environment(\.managedObjectContext, viewContext)
+                                        .environmentObject(netIncomeManager)) {
+                            EmptyView()
+                        }
+                        .opacity(0) // Make the link invisible
+
+                        TransactionRowView(transaction: transaction, onDelete: {
+                            deleteTransaction(transaction)
+                        })
+                    }
+                    .listRowSeparator(.visible)
+                    .listRowInsets(EdgeInsets()) // Tight spacing
                 }
             }
         }
-        .listStyle(PlainListStyle())
-        .sheet(item: $transactionToEdit) { transaction in
-            EditTransactionView(transaction: transaction)
-                .environment(\.managedObjectContext, viewContext)
-                .environmentObject(netIncomeManager)
-        }
+        // Make the list background clear and remove scroll content background
+        .scrollContentBackground(.hidden)
+        .background(Color(.systemBackground))
     }
 
     private func deleteTransaction(_ transaction: Transaction) {

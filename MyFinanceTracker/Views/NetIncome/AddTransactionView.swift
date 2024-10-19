@@ -3,14 +3,13 @@ import CoreData
 
 struct AddTransactionView: View {
     let isIncome: Bool
-    let defaultDay: String
+    @Binding var selectedDay: String
 
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) var dismiss
 
     @State private var descriptionText = ""
     @State private var amount = ""
-    @State private var selectedDay: String
 
     let days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -21,10 +20,9 @@ struct AddTransactionView: View {
 
     @FetchRequest private var quickAddTransactions: FetchedResults<QuickAddTransaction>
 
-    init(isIncome: Bool, defaultDay: String) {
+    init(isIncome: Bool, selectedDay: Binding<String>) {
         self.isIncome = isIncome
-        self.defaultDay = defaultDay
-        _selectedDay = State(initialValue: defaultDay)
+        _selectedDay = selectedDay
 
         let predicate = NSPredicate(format: "isIncome == %@", NSNumber(value: isIncome))
         let sortDescriptors = [NSSortDescriptor(keyPath: \QuickAddTransaction.desc, ascending: true)]
@@ -44,29 +42,14 @@ struct AddTransactionView: View {
                         Text("Day of the Week")
                             .font(.headline)
                             .foregroundColor(.primary)
-
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                ForEach(days, id: \.self) { day in
-                                    Button(action: {
-                                        selectedDay = day
-                                    }) {
-                                        Text(day)
-                                            .font(.subheadline)
-                                            .fontWeight(selectedDay == day ? .semibold : .regular)
-                                            .foregroundColor(selectedDay == day ? .white : .primary)
-                                            .padding(.vertical, 8)
-                                            .padding(.horizontal, 16)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: 20)
-                                                    .fill(selectedDay == day ? Color.purple : Color(UIColor.secondarySystemBackground))
-                                            )
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                }
+                        
+                        Picker("Select Day", selection: $selectedDay) {
+                            ForEach(days, id: \.self) { day in
+                                Text(day)
                             }
-                            .padding(.horizontal, 4)
                         }
+                        .pickerStyle(WheelPickerStyle()) // Apply vertical sliding menu
+                        .frame(height: 150) // Adjust height for better visibility
                     }
                     .padding()
                     .background(Color(UIColor.systemBackground))
@@ -114,41 +97,39 @@ struct AddTransactionView: View {
                     .cornerRadius(16)
                     .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
 
-                    // **Quick Add Transactions Section** (Swapped to appear after Manual Entry)
+                    // **Quick Add Transactions Section** (Vertically Stacked Quick Add Transactions)
                     if !quickAddTransactions.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Quick Add")
                                 .font(.headline)
                                 .foregroundColor(.primary)
 
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                LazyHStack(spacing: 20) {
-                                    ForEach(quickAddTransactions, id: \.id) { transaction in
-                                        Button(action: {
-                                            applyQuickAddTransaction(transaction)
-                                        }) {
-                                            VStack(alignment: .leading, spacing: 6) {
-                                                Text(transaction.desc ?? "")
-                                                    .font(.subheadline)
-                                                    .fontWeight(.semibold)
-                                                    .foregroundColor(.primary)
-                                                Text("$\(String(format: "%.2f", transaction.amount))")
-                                                    .font(.caption)
-                                                    .foregroundColor(transaction.isIncome ? .green : .red)
-                                            }
-                                            .padding()
-                                            .frame(width: 140, height: 90)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: 12)
-                                                    .fill(transaction.isIncome ? Color.green.opacity(0.15) : Color.red.opacity(0.15))
-                                            )
-                                            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 3)
+                            VStack(spacing: 12) { // Vertically stacked quick add transactions
+                                ForEach(quickAddTransactions, id: \.id) { transaction in
+                                    Button(action: {
+                                        applyQuickAddTransaction(transaction)
+                                    }) {
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            Text(transaction.desc ?? "")
+                                                .font(.subheadline)
+                                                .fontWeight(.semibold)
+                                                .foregroundColor(.primary)
+                                            Text("$\(String(format: "%.2f", transaction.amount))")
+                                                .font(.caption)
+                                                .foregroundColor(transaction.isIncome ? .green : .red)
                                         }
-                                        .buttonStyle(PlainButtonStyle())
+                                        .padding()
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .fill(transaction.isIncome ? Color.green.opacity(0.15) : Color.red.opacity(0.15))
+                                        )
+                                        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 3)
                                     }
+                                    .buttonStyle(PlainButtonStyle())
                                 }
-                                .padding(.horizontal)
                             }
+                            .padding(.horizontal)
                         }
                         .padding()
                         .background(Color(UIColor.systemBackground))

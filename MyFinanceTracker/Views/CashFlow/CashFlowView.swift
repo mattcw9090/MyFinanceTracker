@@ -16,91 +16,29 @@ struct CashFlowView: View {
     var body: some View {
         NavigationView {
             List {
-                Section(header:
-                    HStack {
-                        Text("Who owes me money")
-                            .font(.headline)
-                        Spacer()
-                        Button(action: { showingAddOwedToMe = true }) {
-                            Image(systemName: "plus.circle.fill")
-                                .foregroundColor(.green)
-                                .imageScale(.large)
-                        }
-                        .accessibilityLabel("Add People who owe me money")
-                    }
-                ) {
-                    let owedToMeItems = cashFlowItems.filter { $0.isOwedToMe }
-                    if owedToMeItems.isEmpty {
-                        Text("No one owes you money.")
-                            .foregroundColor(.gray)
-                            .italic()
-                    } else {
-                        ForEach(owedToMeItems, id: \.objectID) { item in
-                            CashFlowRowView(item: item)
-                                .swipeActions(edge: .trailing) {
-                                    Button(role: .destructive) {
-                                        deleteCashFlowItem(item)
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                    Button {
-                                        cashFlowItemToEdit = item
-                                    } label: {
-                                        Label("Edit", systemImage: "pencil")
-                                    }
-                                    .tint(.orange)
-                                }
-                        }
-                    }
-                }
-
-                Section(header:
-                    HStack {
-                        Text("Who I owe money")
-                            .font(.headline)
-                        Spacer()
-                        Button(action: { showingAddIOwe = true }) {
-                            Image(systemName: "plus.circle.fill")
-                                .foregroundColor(.red)
-                                .imageScale(.large)
-                        }
-                        .accessibilityLabel("Add People I owe money to")
-                    }
-                ) {
-                    let iOweItems = cashFlowItems.filter { !$0.isOwedToMe }
-                    if iOweItems.isEmpty {
-                        Text("You don't owe money to anyone.")
-                            .foregroundColor(.gray)
-                            .italic()
-                    } else {
-                        ForEach(iOweItems, id: \.objectID) { item in
-                            CashFlowRowView(item: item)
-                                .swipeActions(edge: .trailing) {
-                                    Button(role: .destructive) {
-                                        deleteCashFlowItem(item)
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                    Button {
-                                        cashFlowItemToEdit = item
-                                    } label: {
-                                        Label("Edit", systemImage: "pencil")
-                                    }
-                                    .tint(.orange)
-                                }
-                        }
-                    }
-                }
+                cashFlowSection(
+                    title: "Who owes me money",
+                    items: cashFlowItems.filter { $0.isOwedToMe },
+                    emptyMessage: "No one owes you money.",
+                    emptyImage: "person.fill.questionmark"
+                )
+                
+                cashFlowSection(
+                    title: "Who I owe money",
+                    items: cashFlowItems.filter { !$0.isOwedToMe },
+                    emptyMessage: "You don't owe money to anyone.",
+                    emptyImage: "person.fill.checkmark"
+                )
             }
             .listStyle(InsetGroupedListStyle())
-            .navigationBarTitle("Cash Flow")
-            // Removed the single "+" button from navigation bar
+            .navigationBarTitle("Cash Flow", displayMode: .inline)
+            .navigationBarItems(trailing: addButton)
             .sheet(isPresented: $showingAddOwedToMe) {
                 NavigationView {
                     AddCashFlowItemView(isDefaultOwedToMe: true)
                         .environment(\.managedObjectContext, viewContext)
                 }
-                .presentationDetents([.medium, .large])
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showingAddIOwe) {
@@ -108,7 +46,7 @@ struct CashFlowView: View {
                     AddCashFlowItemView(isDefaultOwedToMe: false)
                         .environment(\.managedObjectContext, viewContext)
                 }
-                .presentationDetents([.medium, .large])
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
             }
             .sheet(item: $cashFlowItemToEdit) { item in
@@ -116,13 +54,54 @@ struct CashFlowView: View {
                     EditCashFlowItemView(item: item)
                         .environment(\.managedObjectContext, viewContext)
                 }
-                .presentationDetents([.medium, .large])
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
             }
         }
     }
 
-    private func deleteCashFlowItem(_ item: CashFlowItem) {
+    private var addButton: some View {
+        Menu {
+            Button(action: { showingAddOwedToMe = true }) {
+                Label("Add Owed to Me", systemImage: "arrow.down.circle.fill")
+            }
+            Button(action: { showingAddIOwe = true }) {
+                Label("Add I Owe", systemImage: "arrow.up.circle.fill")
+            }
+        } label: {
+            Image(systemName: "plus.circle.fill")
+                .font(.title2)
+                .foregroundColor(.accentColor)
+        }
+    }
+
+    private func cashFlowSection(title: String, items: [CashFlowItem], emptyMessage: String, emptyImage: String) -> some View {
+        Section(header: Text(title).font(.title2).bold()) {
+            if items.isEmpty {
+                EmptyStateView(message: emptyMessage, imageName: emptyImage)
+            } else {
+                ForEach(items, id: \.objectID) { item in
+                    CashFlowRowView(item: item)
+                        .listRowInsets(EdgeInsets())
+                        .onTapGesture { cashFlowItemToEdit = item }
+                        .swipeActions {
+                            Button(role: .destructive) { delete(item) } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                            Button {
+                                cashFlowItemToEdit = item
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                            .tint(.orange)
+                        }
+                }
+                .listRowBackground(Color.clear)
+            }
+        }
+    }
+
+    private func delete(_ item: CashFlowItem) {
         viewContext.delete(item)
         saveContext()
     }
@@ -133,5 +112,23 @@ struct CashFlowView: View {
         } catch {
             print("Error saving context: \(error.localizedDescription)")
         }
+    }
+}
+
+struct EmptyStateView: View {
+    var message: String
+    var imageName: String
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: imageName)
+                .font(.largeTitle)
+                .foregroundColor(.secondary)
+            Text(message)
+                .foregroundColor(.secondary)
+                .italic()
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
     }
 }

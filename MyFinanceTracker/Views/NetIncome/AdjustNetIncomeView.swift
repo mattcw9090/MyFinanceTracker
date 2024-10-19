@@ -5,9 +5,12 @@ struct AdjustNetIncomeView: View {
     @Environment(\.dismiss) var dismiss
 
     @State private var amount: String = ""
-    @State private var isAddition: Bool = true
+    @State private var isAddition: Bool = false
     @State private var showAlert: Bool = false
     @State private var alertMessage: String = ""
+    
+    // Focus state to control the keyboard
+    @FocusState private var isAmountFieldFocused: Bool
 
     var body: some View {
         VStack(spacing: 20) {
@@ -39,6 +42,7 @@ struct AdjustNetIncomeView: View {
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(Color.gray.opacity(0.5), lineWidth: 1)
                     )
+                    .focused($isAmountFieldFocused) // Bind to the focus state
             }
             .padding(.horizontal)
 
@@ -76,6 +80,10 @@ struct AdjustNetIncomeView: View {
             Alert(title: Text("Invalid Input"),
                   message: Text(alertMessage),
                   dismissButton: .default(Text("OK")))
+        }
+        .onAppear {
+            // Automatically focus the text field when the view appears
+            isAmountFieldFocused = true
         }
     }
 

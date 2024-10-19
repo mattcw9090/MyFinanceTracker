@@ -5,7 +5,8 @@ struct TransactionRowView: View {
     @ObservedObject var transaction: Transaction
     @Environment(\.managedObjectContext) private var viewContext
 
-    var onEdit: () -> Void
+    @State private var showAddToCashFlowConfirmation = false
+
     var onDelete: () -> Void
 
     var body: some View {
@@ -28,11 +29,6 @@ struct TransactionRowView: View {
                         .foregroundColor(.blue)
                         .imageScale(.large)
                 }
-                Button(action: onEdit) {
-                    Image(systemName: "pencil.circle.fill")
-                        .foregroundColor(.orange)
-                        .imageScale(.large)
-                }
                 Button(action: onDelete) {
                     Image(systemName: "trash.circle.fill")
                         .foregroundColor(.red)
@@ -41,11 +37,22 @@ struct TransactionRowView: View {
             }
             .buttonStyle(BorderlessButtonStyle())
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(Color(UIColor.secondarySystemBackground))
-        .cornerRadius(10)
-        .shadow(radius: 1)
+        // Remove additional padding and background to eliminate spacing
+        // and lines between rows.
+        // Just rely on the List to handle the layout.
+        .alert(isPresented: $showAddToCashFlowConfirmation) {
+            Alert(
+                title: Text("Add to Cash Flow"),
+                message: Text("Do you want to add this completed income transaction to the 'Who owes me' section?"),
+                primaryButton: .default(Text("Yes")) {
+                    addToCashFlow()
+                    saveContext()
+                },
+                secondaryButton: .default(Text("No")) {
+                    saveContext()
+                }
+            )
+        }
     }
 
     private func formattedAmount() -> String {
@@ -56,10 +63,26 @@ struct TransactionRowView: View {
 
     private func markAsComplete() {
         transaction.isCompleted.toggle()
+        if transaction.isIncome {
+            showAddToCashFlowConfirmation = true
+        } else {
+            saveContext()
+        }
+    }
+
+    private func addToCashFlow() {
+        let cashFlowItem = CashFlowItem(context: viewContext)
+        cashFlowItem.id = UUID()
+        cashFlowItem.name = transaction.desc
+        cashFlowItem.amount = transaction.amount
+        cashFlowItem.isOwedToMe = true
+    }
+
+    private func saveContext() {
         do {
             try viewContext.save()
         } catch {
-            print("Error marking transaction as complete: \(error.localizedDescription)")
+            print("Error saving context: \(error.localizedDescription)")
         }
     }
 }

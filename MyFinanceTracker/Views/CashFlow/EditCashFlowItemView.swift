@@ -5,11 +5,9 @@ struct EditCashFlowItemView: View {
     @Environment(\.dismiss) var dismiss
 
     @ObservedObject var item: CashFlowItem
-
     @State private var name: String
     @State private var amount: String
     @State private var isOwedToMe: Bool
-
     @State private var showAlert = false
     @State private var alertMessage = ""
 
@@ -20,45 +18,46 @@ struct EditCashFlowItemView: View {
         _isOwedToMe = State(initialValue: item.isOwedToMe)
     }
 
-    var body: some View {
-        Form {
-            Section(header: Text("Name")) {
-                TextField("Enter name", text: $name)
-            }
-            Section(header: Text("Amount")) {
-                TextField("Enter amount", text: $amount)
-                    .keyboardType(.decimalPad)
-                    .onReceive(amount.publisher.collect()) { newValue in
-                        let filtered = newValue.filter { "0123456789.".contains($0) }
-                        if filtered != newValue {
-                            amount = String(filtered.prefix(10))
-                        }
-                    }
-            }
-            Section(header: Text("Cash Flow Type")) {
-                Picker("Type", selection: $isOwedToMe) {
-                    Text("Owed to me").tag(true)
-                    Text("I owe").tag(false)
-                }
-                .pickerStyle(SegmentedPickerStyle())
-            }
-        }
-        .navigationBarTitle("Edit Cash Flow Item", displayMode: .inline)
-        .navigationBarItems(
-            leading: Button("Cancel") { dismiss() },
-            trailing: Button("Save") { editCashFlowItem() }
-                .disabled(!isFormValid())
-        )
-        .alert(isPresented: $showAlert) {
-            Alert(title: Text("Error"), message: Text(alertMessage), dismissButton: .default(Text("OK")))
-        }
+    private var isFormValid: Bool {
+        guard let amt = Double(amount), amt > 0, !name.isEmpty else { return false }
+        return true
     }
 
-    private func isFormValid() -> Bool {
-        guard let amt = Double(amount), amt > 0, !name.isEmpty else {
-            return false
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 30) {
+                Text("Edit Cash Flow Item")
+                    .font(.largeTitle)
+                    .bold()
+                    .padding(.top, 20)
+
+                CashFlowFormFields(name: $name, amount: $amount, isOwedToMe: $isOwedToMe)
+
+                Button(action: editCashFlowItem) {
+                    Text("Save Changes")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(isFormValid ? Color.accentColor : Color.gray)
+                        .cornerRadius(10)
+                }
+                .disabled(!isFormValid)
+                .padding(.horizontal)
+            }
+            .padding(.bottom, 50)
         }
-        return true
+        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
+        .navigationBarItems(
+            leading: Button("Cancel") { dismiss() }
+        )
+        .alert(isPresented: $showAlert) {
+            Alert(
+                title: Text("Error"),
+                message: Text(alertMessage),
+                dismissButton: .default(Text("OK"))
+            )
+        }
     }
 
     private func editCashFlowItem() {

@@ -51,7 +51,8 @@ struct EditTransactionView: View {
                             Text(day)
                         }
                     }
-                    .pickerStyle(SegmentedPickerStyle())
+                    .pickerStyle(WheelPickerStyle())
+                    .frame(height: 150)
                 }
                 Section(header: Text("Transaction Type").font(.headline)) {
                     Picker("Type", selection: $isIncome) {
