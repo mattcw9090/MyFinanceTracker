@@ -26,99 +26,121 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationView {
-            List {
-                // Predefined Transactions Section
-                Section(header: SectionHeader(title: "Predefined Transactions", action: {
-                    showingAddPredefinedTransaction = true
-                })) {
-                    if predefinedTransactions.isEmpty {
-                        EmptyStateView(message: "No predefined transactions. Add some to get started.", systemImage: "tray")
-                    } else {
-                        ForEach(daysOfWeek, id: \.self) { day in
-                            let transactionsForDay = predefinedTransactions.filter { $0.dayOfWeek == day }
-                            if !transactionsForDay.isEmpty {
-                                VStack(alignment: .leading, spacing: 8) {
+            ZStack {
+                LinearGradient(
+                    gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+
+                List {
+                    // Predefined Transactions Section
+                    Section(header: SectionHeader(title: "Predefined Transactions") {
+                        showingAddPredefinedTransaction = true
+                    }) {
+                        if predefinedTransactions.isEmpty {
+                            EmptyStateView(message: "No predefined transactions. Add some to get started.", systemImage: "tray")
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                        } else {
+                            ForEach(daysOfWeek, id: \.self) { day in
+                                let transactionsForDay = predefinedTransactions.filter { $0.dayOfWeek == day }
+                                if !transactionsForDay.isEmpty {
                                     Text(day)
                                         .font(.title3)
                                         .fontWeight(.bold)
-                                        .padding(.vertical, 4)
                                         .foregroundColor(.primary)
-                                    
+                                        .padding(.vertical, 8)
+                                        .listRowSeparator(.visible)
+                                        .listRowInsets(EdgeInsets())
+                                        .listRowBackground(Color.clear)
+
                                     ForEach(transactionsForDay, id: \.id) { transaction in
-                                        PredefinedTransactionCard(transaction: transaction)
+                                        PredefinedTransactionRow(transaction: transaction)
                                             .onTapGesture {
                                                 predefinedTransactionToEdit = transaction
                                             }
+                                            .listRowInsets(EdgeInsets())
+                                            .listRowSeparator(.visible)
+                                            .listRowBackground(Color.clear)
                                     }
                                     .onDelete { offsets in
                                         deletePredefinedTransaction(offsets, from: transactionsForDay)
                                     }
                                 }
-                                .padding(.vertical, 4)
                             }
                         }
                     }
-                }
 
-                // Quick Add Transactions Section
-                Section(header: SectionHeader(title: "Quick Add Transactions", action: {
-                    showingAddQuickAddTransaction = true
-                })) {
-                    if quickAddTransactions.isEmpty {
-                        EmptyStateView(message: "No quick add transactions. Add some to get started.", systemImage: "plus.circle")
-                    } else {
-                        // Categorize Quick Add Transactions into Income and Expense
-                        let incomeQuickAddTransactions = quickAddTransactions.filter { $0.isIncome }
-                        let expenseQuickAddTransactions = quickAddTransactions.filter { !$0.isIncome }
+                    // Quick Add Transactions Section
+                    Section(header: SectionHeader(title: "Quick Add Transactions") {
+                        showingAddQuickAddTransaction = true
+                    }) {
+                        if quickAddTransactions.isEmpty {
+                            EmptyStateView(message: "No quick add transactions. Add some to get started.", systemImage: "plus.circle")
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                        } else {
+                            let incomeQuickAddTransactions = quickAddTransactions.filter { $0.isIncome }
+                            let expenseQuickAddTransactions = quickAddTransactions.filter { !$0.isIncome }
 
-                        if !incomeQuickAddTransactions.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
+                            if !incomeQuickAddTransactions.isEmpty {
                                 Text("Income")
                                     .font(.title3)
                                     .fontWeight(.bold)
-                                    .padding(.vertical, 4)
                                     .foregroundColor(.green)
-                                
+                                    .padding(.vertical, 8)
+                                    .listRowSeparator(.visible)
+                                    .listRowInsets(EdgeInsets())
+                                    .listRowBackground(Color.clear)
+
                                 ForEach(incomeQuickAddTransactions, id: \.id) { transaction in
-                                    QuickAddTransactionCard(transaction: transaction)
+                                    QuickAddTransactionRow(transaction: transaction)
                                         .onTapGesture {
                                             quickAddTransactionToEdit = transaction
                                         }
+                                        .listRowInsets(EdgeInsets())
+                                        .listRowSeparator(.visible)
+                                        .listRowBackground(Color.clear)
                                 }
                                 .onDelete { offsets in
                                     deleteQuickAddTransaction(offsets: offsets, from: incomeQuickAddTransactions)
                                 }
                             }
-                            .padding(.vertical, 4)
-                        }
 
-                        if !expenseQuickAddTransactions.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
+                            if !expenseQuickAddTransactions.isEmpty {
                                 Text("Expense")
                                     .font(.title3)
                                     .fontWeight(.bold)
-                                    .padding(.vertical, 4)
                                     .foregroundColor(.red)
-                                
+                                    .padding(.vertical, 8)
+                                    .listRowSeparator(.visible)
+                                    .listRowInsets(EdgeInsets())
+                                    .listRowBackground(Color.clear)
+
                                 ForEach(expenseQuickAddTransactions, id: \.id) { transaction in
-                                    QuickAddTransactionCard(transaction: transaction)
+                                    QuickAddTransactionRow(transaction: transaction)
                                         .onTapGesture {
                                             quickAddTransactionToEdit = transaction
                                         }
+                                        .listRowInsets(EdgeInsets())
+                                        .listRowSeparator(.visible)
+                                        .listRowBackground(Color.clear)
                                 }
                                 .onDelete { offsets in
                                     deleteQuickAddTransaction(offsets: offsets, from: expenseQuickAddTransactions)
                                 }
                             }
-                            .padding(.vertical, 4)
                         }
                     }
                 }
+                .listStyle(PlainListStyle())
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
             }
-            .listStyle(InsetGroupedListStyle())
             .navigationBarTitle("Settings", displayMode: .inline)
             .navigationBarItems(trailing: EditButton())
-            // Sheets for Predefined Transactions
             .sheet(isPresented: $showingAddPredefinedTransaction) {
                 NavigationView {
                     AddPredefinedTransactionView()
@@ -131,7 +153,6 @@ struct SettingsView: View {
                         .environment(\.managedObjectContext, viewContext)
                 }
             }
-            // Sheets for Quick Add Transactions
             .sheet(isPresented: $showingAddQuickAddTransaction) {
                 NavigationView {
                     AddQuickAddTransactionView()
@@ -188,84 +209,88 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Predefined Transaction Card View
-    struct PredefinedTransactionCard: View {
+    // MARK: - Predefined Transaction Row
+    struct PredefinedTransactionRow: View {
         let transaction: PredefinedTransaction
 
         var body: some View {
-            HStack {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(transaction.desc ?? "No Description")
-                        .font(.body)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
-                    HStack {
-                        Image(systemName: transaction.isIncome ? "arrow.up.circle" : "arrow.down.circle")
-                            .foregroundColor(transaction.isIncome ? .green : .red)
-                            .imageScale(.small)
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(UIColor.secondarySystemBackground))
+                    .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+
+                HStack(spacing: 16) {
+                    Image(systemName: transaction.isIncome ? "arrow.up.circle" : "arrow.down.circle")
+                        .foregroundColor(transaction.isIncome ? .green : .red)
+                        .imageScale(.medium)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(transaction.desc ?? "No Description")
+                            .font(.body)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
                         Text(transaction.isIncome ? "Income" : "Expense")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
+
+                    Spacer()
+
+                    Text(formattedAmount(transaction: transaction))
+                        .foregroundColor(transaction.isIncome ? .green : .red)
+                        .fontWeight(.bold)
+                        .font(.body)
                 }
-                Spacer()
-                Text(formattedAmount(transaction: transaction))
-                    .foregroundColor(transaction.isIncome ? .green : .red)
-                    .fontWeight(.bold)
-                    .frame(minWidth: 80, alignment: .trailing)
+                .padding()
             }
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(UIColor.secondarySystemBackground))
-            )
-            .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
             .padding(.vertical, 4)
+            .padding(.horizontal, 8)
         }
 
-        // Helper to format amount
         private func formattedAmount(transaction: PredefinedTransaction) -> String {
             let amount = transaction.isIncome ? transaction.amount : -transaction.amount
             return String(format: "$%.2f", amount)
         }
     }
 
-    // MARK: - Quick Add Transaction Card View
-    struct QuickAddTransactionCard: View {
+    // MARK: - Quick Add Transaction Row
+    struct QuickAddTransactionRow: View {
         let transaction: QuickAddTransaction
 
         var body: some View {
-            HStack {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(transaction.desc ?? "No Description")
-                        .font(.body)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
-                    HStack {
-                        Image(systemName: transaction.isIncome ? "arrow.up.circle" : "arrow.down.circle")
-                            .foregroundColor(transaction.isIncome ? .green : .red)
-                            .imageScale(.small)
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(UIColor.secondarySystemBackground))
+                    .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+
+                HStack(spacing: 16) {
+                    Image(systemName: transaction.isIncome ? "arrow.up.circle" : "arrow.down.circle")
+                        .foregroundColor(transaction.isIncome ? .green : .red)
+                        .imageScale(.medium)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(transaction.desc ?? "No Description")
+                            .font(.body)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
                         Text(transaction.isIncome ? "Income" : "Expense")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
+
+                    Spacer()
+
+                    Text(formattedAmount(transaction: transaction))
+                        .foregroundColor(transaction.isIncome ? .green : .red)
+                        .fontWeight(.bold)
+                        .font(.body)
                 }
-                Spacer()
-                Text(formattedAmount(transaction: transaction))
-                    .foregroundColor(transaction.isIncome ? .green : .red)
-                    .fontWeight(.bold)
-                    .frame(minWidth: 80, alignment: .trailing)
+                .padding()
             }
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(UIColor.secondarySystemBackground))
-            )
-            .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
             .padding(.vertical, 4)
+            .padding(.horizontal, 8)
         }
 
-        // Helper to format amount
         private func formattedAmount(transaction: QuickAddTransaction) -> String {
             let amount = transaction.isIncome ? transaction.amount : -transaction.amount
             return String(format: "$%.2f", amount)
@@ -274,18 +299,6 @@ struct SettingsView: View {
 
     // MARK: - Helper Functions
 
-    // Helper function to format amount
-    private func formattedAmount(transaction: PredefinedTransaction) -> String {
-        let amount = transaction.isIncome ? transaction.amount : -transaction.amount
-        return String(format: "$%.2f", amount)
-    }
-
-    private func formattedAmount(transaction: QuickAddTransaction) -> String {
-        let amount = transaction.isIncome ? transaction.amount : -transaction.amount
-        return String(format: "$%.2f", amount)
-    }
-
-    // Functions for Predefined Transactions
     private func deletePredefinedTransaction(_ offsets: IndexSet, from transactionsForDay: [PredefinedTransaction]) {
         withAnimation {
             offsets.map { transactionsForDay[$0] }.forEach(viewContext.delete)
@@ -293,7 +306,6 @@ struct SettingsView: View {
         }
     }
 
-    // Functions for Quick Add Transactions
     private func deleteQuickAddTransaction(offsets: IndexSet, from transactionsSubset: [QuickAddTransaction]) {
         withAnimation {
             offsets.map { transactionsSubset[$0] }.forEach(viewContext.delete)

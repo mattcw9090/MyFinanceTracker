@@ -34,6 +34,7 @@ struct EditTransactionView: View {
                     TextField("Enter description", text: $descriptionText)
                         .padding(.vertical, 8)
                 }
+
                 Section(header: Text("Amount").font(.headline)) {
                     TextField("Enter amount", text: $amount)
                         .keyboardType(.decimalPad)
@@ -45,6 +46,7 @@ struct EditTransactionView: View {
                             }
                         }
                 }
+
                 Section(header: Text("Day of the Week").font(.headline)) {
                     Picker("Select Day", selection: $selectedDay) {
                         ForEach(days, id: \.self) { day in
@@ -54,12 +56,14 @@ struct EditTransactionView: View {
                     .pickerStyle(WheelPickerStyle())
                     .frame(height: 150)
                 }
+
                 Section(header: Text("Transaction Type").font(.headline)) {
                     Picker("Type", selection: $isIncome) {
                         Text("Income").tag(true)
                         Text("Expense").tag(false)
                     }
                     .pickerStyle(SegmentedPickerStyle())
+                    .tint(.accentColor)
                 }
             }
             .navigationBarTitle("Edit Transaction", displayMode: .inline)

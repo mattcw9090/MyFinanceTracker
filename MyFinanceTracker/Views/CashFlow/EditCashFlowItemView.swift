@@ -24,30 +24,38 @@ struct EditCashFlowItemView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 30) {
-                Text("Edit Cash Flow Item")
-                    .font(.largeTitle)
-                    .bold()
-                    .padding(.top, 20)
+        ZStack {
+            LinearGradient(gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.secondarySystemBackground)]),
+                           startPoint: .topLeading,
+                           endPoint: .bottomTrailing)
+                .ignoresSafeArea()
 
-                CashFlowFormFields(name: $name, amount: $amount, isOwedToMe: $isOwedToMe)
+            ScrollView {
+                VStack(spacing: 30) {
+                    Text("Edit Cash Flow Item")
+                        .font(.largeTitle)
+                        .bold()
+                        .padding(.top, 20)
+                        .foregroundColor(.primary)
 
-                Button(action: editCashFlowItem) {
-                    Text("Save Changes")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(isFormValid ? Color.accentColor : Color.gray)
-                        .cornerRadius(10)
+                    CashFlowFormFields(name: $name, amount: $amount, isOwedToMe: $isOwedToMe)
+
+                    Button(action: editCashFlowItem) {
+                        Text("Save Changes")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(isFormValid ? Color.accentColor : Color.gray)
+                            .cornerRadius(10)
+                            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+                    }
+                    .disabled(!isFormValid)
+                    .padding(.horizontal)
                 }
-                .disabled(!isFormValid)
-                .padding(.horizontal)
+                .padding(.bottom, 50)
             }
-            .padding(.bottom, 50)
         }
-        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
         .navigationBarItems(
             leading: Button("Cancel") { dismiss() }
         )

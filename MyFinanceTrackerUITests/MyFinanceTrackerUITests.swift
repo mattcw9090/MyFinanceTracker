@@ -1,43 +1,48 @@
-//
-//  MyFinanceTrackerUITests.swift
-//  MyFinanceTrackerUITests
-//
-//  Created by Matthew Chew on 1/10/24.
-//
-
 import XCTest
 
 final class MyFinanceTrackerUITests: XCTestCase {
+    
+    private var app: XCUIApplication!
 
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
+        app = XCUIApplication()
+        app.launch()
     }
 
     override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
+        // Perform any cleanup after tests
+    }
+    
+    func testTabBarItemsExist() throws {
+        // Check if the tab bar items are visible
+        let netIncomeTab = app.buttons["Net Income"]
+        let cashFlowTab = app.buttons["Cash Flow"]
+        let settingsTab = app.buttons["Settings"]
+        
+        XCTAssertTrue(netIncomeTab.exists, "The 'Net Income' tab should exist.")
+        XCTAssertTrue(cashFlowTab.exists, "The 'Cash Flow' tab should exist.")
+        XCTAssertTrue(settingsTab.exists, "The 'Settings' tab should exist.")
     }
 
-    @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
-        let app = XCUIApplication()
-        app.launch()
+    func testSwitchingTabsAndElements() throws {
+        let netIncomeTab = app.buttons["Net Income"]
+        let cashFlowTab = app.buttons["Cash Flow"]
+        let settingsTab = app.buttons["Settings"]
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-    }
+        // Test: "Net Income" tab by default should be selected first when app is launched
+        XCTAssertTrue(app.staticTexts["Net Income:"].exists, "Net Income view should display 'Net Income:' label.")
 
-    @MainActor
-    func testLaunchPerformance() throws {
-        if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 7.0, *) {
-            // This measures how long it takes to launch your application.
-            measure(metrics: [XCTApplicationLaunchMetric()]) {
-                XCUIApplication().launch()
-            }
-        }
+        // Test: Select "Cash Flow" tab
+        cashFlowTab.tap()
+        XCTAssertTrue(app.navigationBars["Cash Flow"].exists, "Cash Flow view should display a navigation bar titled 'Cash Flow'.")
+
+        // Test: Select "Settings" tab
+        settingsTab.tap()
+        XCTAssertTrue(app.navigationBars["Settings"].exists, "Settings view should display a navigation bar titled 'Settings'.")
+
+        // Test: Switch back to the Net Income tab and re-verify the net income text
+        netIncomeTab.tap()
+        XCTAssertTrue(app.staticTexts["Net Income:"].exists, "Should be able to switch back and still see 'Net Income:' in the Net Income view.")
     }
 }

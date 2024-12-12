@@ -37,9 +37,14 @@ struct TransactionRowView: View {
             }
             .buttonStyle(BorderlessButtonStyle())
         }
-        // Remove additional padding and background to eliminate spacing
-        // and lines between rows.
-        // Just rely on the List to handle the layout.
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(UIColor.secondarySystemBackground))
+                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 3)
+        )
+        .padding(.vertical, 8)
+        .padding(.horizontal, 8)
         .alert(isPresented: $showAddToCashFlowConfirmation) {
             Alert(
                 title: Text("Add to Cash Flow"),

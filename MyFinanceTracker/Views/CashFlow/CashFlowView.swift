@@ -15,22 +15,33 @@ struct CashFlowView: View {
 
     var body: some View {
         NavigationView {
-            List {
-                cashFlowSection(
-                    title: "Who owes me money",
-                    items: cashFlowItems.filter { $0.isOwedToMe },
-                    emptyMessage: "No one owes you money.",
-                    emptyImage: "person.fill.questionmark"
-                )
-                
-                cashFlowSection(
-                    title: "Who I owe money",
-                    items: cashFlowItems.filter { !$0.isOwedToMe },
-                    emptyMessage: "You don't owe money to anyone.",
-                    emptyImage: "person.fill.checkmark"
-                )
+            ZStack {
+                // Background gradient
+                LinearGradient(gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.secondarySystemBackground)]),
+                               startPoint: .topLeading,
+                               endPoint: .bottomTrailing)
+                .ignoresSafeArea()
+
+                VStack {
+                    List {
+                        cashFlowSection(
+                            title: "Who owes me money",
+                            items: cashFlowItems.filter { $0.isOwedToMe },
+                            emptyMessage: "No one owes you money.",
+                            emptyImage: "person.fill.questionmark"
+                        )
+
+                        cashFlowSection(
+                            title: "Who I owe money",
+                            items: cashFlowItems.filter { !$0.isOwedToMe },
+                            emptyMessage: "You don't owe money to anyone.",
+                            emptyImage: "person.fill.checkmark"
+                        )
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden) // Removes default background
+                }
             }
-            .listStyle(InsetGroupedListStyle())
             .navigationBarTitle("Cash Flow", displayMode: .inline)
             .navigationBarItems(trailing: addButton)
             .sheet(isPresented: $showingAddOwedToMe) {
@@ -76,13 +87,21 @@ struct CashFlowView: View {
     }
 
     private func cashFlowSection(title: String, items: [CashFlowItem], emptyMessage: String, emptyImage: String) -> some View {
-        Section(header: Text(title).font(.title2).bold()) {
+        Section(header:
+                    Text(title)
+                    .font(.title2)
+                    .bold()
+                    .foregroundColor(.primary)
+        ) {
             if items.isEmpty {
                 EmptyStateView(message: emptyMessage, imageName: emptyImage)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
             } else {
                 ForEach(items, id: \.objectID) { item in
                     CashFlowRowView(item: item)
-                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
                         .onTapGesture { cashFlowItemToEdit = item }
                         .swipeActions {
                             Button(role: .destructive) { delete(item) } label: {
@@ -96,7 +115,6 @@ struct CashFlowView: View {
                             .tint(.orange)
                         }
                 }
-                .listRowBackground(Color.clear)
             }
         }
     }

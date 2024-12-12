@@ -14,6 +14,7 @@ struct TransactionListView: View {
                     .foregroundColor(.gray)
                     .italic()
                     .padding()
+                    .listRowBackground(Color.clear)
             } else {
                 ForEach(transactions, id: \.id) { transaction in
                     ZStack {
@@ -22,18 +23,18 @@ struct TransactionListView: View {
                                         .environmentObject(netIncomeManager)) {
                             EmptyView()
                         }
-                        .opacity(0) // Make the link invisible
+                        .opacity(0)
 
                         TransactionRowView(transaction: transaction, onDelete: {
                             deleteTransaction(transaction)
                         })
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
                     }
-                    .listRowSeparator(.visible)
-                    .listRowInsets(EdgeInsets()) // Tight spacing
                 }
             }
         }
-        // Make the list background clear and remove scroll content background
+        .listStyle(PlainListStyle())
         .scrollContentBackground(.hidden)
         .background(Color(.systemBackground))
     }

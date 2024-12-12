@@ -26,37 +26,46 @@ struct EditPredefinedTransactionView: View {
 
     var body: some View {
         NavigationView {
-            Form {
-                Section(header: Text("Description").font(.headline)) {
-                    TextField("Enter description", text: $descriptionText)
-                        .padding(.vertical, 8)
-                }
-                Section(header: Text("Amount").font(.headline)) {
-                    TextField("Enter amount", text: $amount)
-                        .keyboardType(.decimalPad)
-                        .padding(.vertical, 8)
-                        .onReceive(amount.publisher.collect()) { newValue in
-                            let filtered = newValue.filter { "0123456789.".contains($0) }
-                            if filtered != newValue {
-                                amount = String(filtered.prefix(10))
+            ZStack {
+                LinearGradient(
+                    gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+
+                Form {
+                    Section(header: Text("Description").font(.headline)) {
+                        TextField("Enter description", text: $descriptionText)
+                    }
+                    Section(header: Text("Amount").font(.headline)) {
+                        TextField("Enter amount", text: $amount)
+                            .keyboardType(.decimalPad)
+                            .onReceive(amount.publisher.collect()) { newValue in
+                                let filtered = newValue.filter { "0123456789.".contains($0) }
+                                if filtered != newValue {
+                                    amount = String(filtered.prefix(10))
+                                }
+                            }
+                    }
+                    Section(header: Text("Day of the Week").font(.headline)) {
+                        Picker("Select Day", selection: $selectedDay) {
+                            ForEach(days, id: \.self) { day in
+                                Text(day)
                             }
                         }
-                }
-                Section(header: Text("Day of the Week").font(.headline)) {
-                    Picker("Select Day", selection: $selectedDay) {
-                        ForEach(days, id: \.self) { day in
-                            Text(day)
+                        .pickerStyle(MenuPickerStyle())
+                    }
+                    Section(header: Text("Transaction Type").font(.headline)) {
+                        Picker("Type", selection: $isIncome) {
+                            Text("Income").tag(true)
+                            Text("Expense").tag(false)
                         }
+                        .pickerStyle(SegmentedPickerStyle())
                     }
-                    .pickerStyle(MenuPickerStyle())
                 }
-                Section(header: Text("Transaction Type").font(.headline)) {
-                    Picker("Type", selection: $isIncome) {
-                        Text("Income").tag(true)
-                        Text("Expense").tag(false)
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                }
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
             }
             .navigationBarTitle("Edit Predefined Transaction", displayMode: .inline)
             .navigationBarItems(

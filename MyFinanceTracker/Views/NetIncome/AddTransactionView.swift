@@ -35,148 +35,158 @@ struct AddTransactionView: View {
 
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 25) { // Increased spacing for better separation
-                    // Day Picker Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Day of the Week")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        
-                        Picker("Select Day", selection: $selectedDay) {
-                            ForEach(days, id: \.self) { day in
-                                Text(day)
-                            }
-                        }
-                        .pickerStyle(WheelPickerStyle()) // Apply vertical sliding menu
-                        .frame(height: 150) // Adjust height for better visibility
-                    }
-                    .padding()
-                    .background(Color(UIColor.systemBackground))
-                    .cornerRadius(16)
-                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+            ZStack {
+                LinearGradient(
+                    gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
 
-                    // **Manual Entry Section** (Header Removed, Labels Enlarged, Icons Removed)
-                    VStack(alignment: .leading, spacing: 18) {
-                        // DESCRIPTION Label and Input
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("DESCRIPTION")
-                                .font(.headline) // Increased font size
-                                .fontWeight(.semibold)
-                                .foregroundColor(.primary)
-
-                            TextField("Enter Description", text: $descriptionText)
-                                .padding(12)
-                                .background(Color(UIColor.secondarySystemBackground))
-                                .cornerRadius(8)
-                                .disableAutocorrection(true) // Optional: Disable autocorrection for description
-                        }
-
-                        // AMOUNT Label and Input
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("AMOUNT")
-                                .font(.headline) // Increased font size
-                                .fontWeight(.semibold)
-                                .foregroundColor(.primary)
-
-                            TextField("Enter Amount", text: $amount)
-                                .keyboardType(.decimalPad)
-                                .padding(12)
-                                .background(Color(UIColor.secondarySystemBackground))
-                                .cornerRadius(8)
-                                .onReceive(amount.publisher.collect()) { newValue in
-                                    let filtered = newValue.filter { "0123456789.".contains($0) }
-                                    if filtered != newValue {
-                                        amount = String(filtered.prefix(10))
-                                    }
-                                }
-                        }
-                    }
-                    .padding()
-                    .background(Color(UIColor.systemBackground))
-                    .cornerRadius(16)
-                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
-
-                    // **Quick Add Transactions Section** (Vertically Stacked Quick Add Transactions)
-                    if !quickAddTransactions.isEmpty {
+                ScrollView {
+                    VStack(spacing: 25) {
+                        // Day Picker Card
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Quick Add")
+                            Text("Day of the Week")
                                 .font(.headline)
                                 .foregroundColor(.primary)
 
-                            VStack(spacing: 12) { // Vertically stacked quick add transactions
-                                ForEach(quickAddTransactions, id: \.id) { transaction in
-                                    Button(action: {
-                                        applyQuickAddTransaction(transaction)
-                                    }) {
-                                        VStack(alignment: .leading, spacing: 6) {
-                                            Text(transaction.desc ?? "")
-                                                .font(.subheadline)
-                                                .fontWeight(.semibold)
-                                                .foregroundColor(.primary)
-                                            Text("$\(String(format: "%.2f", transaction.amount))")
-                                                .font(.caption)
-                                                .foregroundColor(transaction.isIncome ? .green : .red)
-                                        }
-                                        .padding()
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(transaction.isIncome ? Color.green.opacity(0.15) : Color.red.opacity(0.15))
-                                        )
-                                        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 3)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
+                            Picker("Select Day", selection: $selectedDay) {
+                                ForEach(days, id: \.self) { day in
+                                    Text(day)
                                 }
                             }
-                            .padding(.horizontal)
+                            .pickerStyle(WheelPickerStyle())
+                            .frame(height: 150)
                         }
                         .padding()
-                        .background(Color(UIColor.systemBackground))
-                        .cornerRadius(16)
-                        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
-                    }
-
-                    Spacer()
-                }
-                .padding(.vertical)
-            }
-            .background(
-                LinearGradient(
-                    gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .edgesIgnoringSafeArea(.all)
-            )
-            .navigationBarTitle(isIncome ? "Add Income" : "Add Expense", displayMode: .inline)
-            .navigationBarItems(
-                leading: Button(action: {
-                    dismiss()
-                }) {
-                    Text("Cancel")
-                        .fontWeight(.semibold)
-                        .foregroundColor(.purple)
-                },
-                trailing: Button(action: {
-                    addTransaction()
-                }) {
-                    Text("Save")
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
                         .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(isFormValid() ? Color.purple : Color.gray.opacity(0.5))
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(UIColor.systemBackground))
+                                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
                         )
+                        .padding(.horizontal)
+
+                        // Manual Entry Card
+                        VStack(alignment: .leading, spacing: 18) {
+                            // Description Field
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("DESCRIPTION")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.primary)
+
+                                TextField("Enter Description", text: $descriptionText)
+                                    .padding(12)
+                                    .background(Color(UIColor.secondarySystemBackground))
+                                    .cornerRadius(8)
+                                    .disableAutocorrection(true)
+                            }
+
+                            // Amount Field
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("AMOUNT")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.primary)
+
+                                TextField("Enter Amount", text: $amount)
+                                    .keyboardType(.decimalPad)
+                                    .padding(12)
+                                    .background(Color(UIColor.secondarySystemBackground))
+                                    .cornerRadius(8)
+                                    .onReceive(amount.publisher.collect()) { newValue in
+                                        let filtered = newValue.filter { "0123456789.".contains($0) }
+                                        if filtered != newValue {
+                                            amount = String(filtered.prefix(10))
+                                        }
+                                    }
+                            }
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(UIColor.systemBackground))
+                                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+                        )
+                        .padding(.horizontal)
+
+                        // Quick Add Card
+                        if !quickAddTransactions.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Quick Add")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+
+                                VStack(spacing: 12) {
+                                    ForEach(quickAddTransactions, id: \.id) { transaction in
+                                        Button(action: {
+                                            applyQuickAddTransaction(transaction)
+                                        }) {
+                                            VStack(alignment: .leading, spacing: 6) {
+                                                Text(transaction.desc ?? "")
+                                                    .font(.subheadline)
+                                                    .fontWeight(.semibold)
+                                                    .foregroundColor(.primary)
+                                                Text("$\(String(format: "%.2f", transaction.amount))")
+                                                    .font(.caption)
+                                                    .foregroundColor(transaction.isIncome ? .green : .red)
+                                            }
+                                            .padding()
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .fill(transaction.isIncome ? Color.green.opacity(0.15) : Color.red.opacity(0.15))
+                                            )
+                                            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 3)
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color(UIColor.systemBackground))
+                                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+                            )
+                            .padding(.horizontal)
+                        }
+
+                        Spacer(minLength: 30)
+                    }
+                    .padding(.vertical)
                 }
-                .disabled(!isFormValid())
-            )
-            .alert(isPresented: $showAlert) {
-                Alert(title: Text("Error"),
-                      message: Text(alertMessage),
-                      dismissButton: .default(Text("OK")))
+                .navigationBarTitle(isIncome ? "Add Income" : "Add Expense", displayMode: .inline)
+                .navigationBarItems(
+                    leading: Button(action: {
+                        dismiss()
+                    }) {
+                        Text("Cancel")
+                            .fontWeight(.semibold)
+                            .foregroundColor(.purple)
+                    },
+                    trailing: Button(action: {
+                        addTransaction()
+                    }) {
+                        Text("Save")
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(isFormValid() ? Color.purple : Color.gray.opacity(0.5))
+                            )
+                    }
+                    .disabled(!isFormValid())
+                )
+                .alert(isPresented: $showAlert) {
+                    Alert(title: Text("Error"),
+                          message: Text(alertMessage),
+                          dismissButton: .default(Text("OK")))
+                }
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())

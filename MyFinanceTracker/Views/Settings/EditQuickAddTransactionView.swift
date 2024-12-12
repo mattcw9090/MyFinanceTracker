@@ -22,29 +22,38 @@ struct EditQuickAddTransactionView: View {
 
     var body: some View {
         NavigationView {
-            Form {
-                Section(header: Text("Description").font(.headline)) {
-                    TextField("Enter description", text: $descriptionText)
-                        .padding(.vertical, 8)
-                }
-                Section(header: Text("Amount").font(.headline)) {
-                    TextField("Enter amount", text: $amount)
-                        .keyboardType(.decimalPad)
-                        .padding(.vertical, 8)
-                        .onReceive(amount.publisher.collect()) { newValue in
-                            let filtered = newValue.filter { "0123456789.".contains($0) }
-                            if filtered != newValue {
-                                amount = String(filtered.prefix(10))
-                            }
-                        }
-                }
-                Section(header: Text("Transaction Type").font(.headline)) {
-                    Picker("Type", selection: $isIncome) {
-                        Text("Income").tag(true)
-                        Text("Expense").tag(false)
+            ZStack {
+                LinearGradient(
+                    gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+
+                Form {
+                    Section(header: Text("Description").font(.headline)) {
+                        TextField("Enter description", text: $descriptionText)
                     }
-                    .pickerStyle(SegmentedPickerStyle())
+                    Section(header: Text("Amount").font(.headline)) {
+                        TextField("Enter amount", text: $amount)
+                            .keyboardType(.decimalPad)
+                            .onReceive(amount.publisher.collect()) { newValue in
+                                let filtered = newValue.filter { "0123456789.".contains($0) }
+                                if filtered != newValue {
+                                    amount = String(filtered.prefix(10))
+                                }
+                            }
+                    }
+                    Section(header: Text("Transaction Type").font(.headline)) {
+                        Picker("Type", selection: $isIncome) {
+                            Text("Income").tag(true)
+                            Text("Expense").tag(false)
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                    }
                 }
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
             }
             .navigationBarTitle("Edit Quick Add Transaction", displayMode: .inline)
             .navigationBarItems(

@@ -4,7 +4,6 @@ import CoreData
 struct TransactionsView: View {
     enum ActiveAlert: Identifiable {
         case reset, initializeWeek, success, noPredefinedTransactions
-
         var id: Int { hashValue }
     }
 
@@ -34,77 +33,75 @@ struct TransactionsView: View {
 
     var body: some View {
         NavigationView {
-            VStack {
-                // Make sure background matches system background
-                // to avoid patchy grey areas.
-                NetIncomeView()
+            ZStack {
+                Color(UIColor.systemBackground).ignoresSafeArea()
+                VStack {
+                    NetIncomeView()
+                        .padding(.horizontal)
+                        .padding(.top)
+
+                    // Add Income/Expense Buttons
+                    HStack(spacing: 20) {
+                        Button(action: { showingAddIncome.toggle() }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                Text("Add Income")
+                                    .fontWeight(.semibold)
+                            }
+                            .padding()
+                            .foregroundColor(.white)
+                            .background(Color.green)
+                            .cornerRadius(10)
+                            .shadow(radius: 2)
+                        }
+                        .sheet(isPresented: $showingAddIncome) {
+                            AddTransactionView(isIncome: true, selectedDay: $selectedDay)
+                                .environment(\.managedObjectContext, viewContext)
+                                .environmentObject(netIncomeManager)
+                        }
+
+                        Button(action: { showingAddExpense.toggle() }) {
+                            HStack {
+                                Image(systemName: "minus.circle.fill")
+                                Text("Add Expense")
+                                    .fontWeight(.semibold)
+                            }
+                            .padding()
+                            .foregroundColor(.white)
+                            .background(Color.red)
+                            .cornerRadius(10)
+                            .shadow(radius: 2)
+                        }
+                        .sheet(isPresented: $showingAddExpense) {
+                            AddTransactionView(isIncome: false, selectedDay: $selectedDay)
+                                .environment(\.managedObjectContext, viewContext)
+                                .environmentObject(netIncomeManager)
+                        }
+                    }
                     .padding(.horizontal)
-                    .padding(.top)
+                    .padding(.bottom, 10)
 
-                HStack(spacing: 20) {
-                    Button(action: { showingAddIncome.toggle() }) {
-                        HStack {
-                            Image(systemName: "plus.circle.fill")
-                            Text("Add Income")
-                                .fontWeight(.semibold)
-                        }
-                        .padding()
-                        .foregroundColor(.white)
-                        .background(Color.green)
-                        .cornerRadius(10)
-                        .shadow(radius: 2)
-                    }
-                    .sheet(isPresented: $showingAddIncome) {
-                        AddTransactionView(isIncome: true, selectedDay: $selectedDay)
-                            .environment(\.managedObjectContext, viewContext)
-                            .environmentObject(netIncomeManager)
-                    }
+                    // Daily Transactions TabView
+                    TabView(selection: $selectedDay) {
+                        ForEach(days, id: \.self) { day in
+                            VStack(alignment: .leading) {
+                                Text(day)
+                                    .font(.largeTitle)
+                                    .bold()
+                                    .padding(.bottom, 10)
 
-                    Button(action: { showingAddExpense.toggle() }) {
-                        HStack {
-                            Image(systemName: "minus.circle.fill")
-                            Text("Add Expense")
-                                .fontWeight(.semibold)
+                                TransactionListView(day: day, transactions: transactionsForDay(day))
+                                    .listStyle(PlainListStyle())
+                            }
+                            .background(Color(.systemBackground))
+                            .padding()
+                            .tag(day)
                         }
-                        .padding()
-                        .foregroundColor(.white)
-                        .background(Color.red)
-                        .cornerRadius(10)
-                        .shadow(radius: 2)
                     }
-                    .sheet(isPresented: $showingAddExpense) {
-                        AddTransactionView(isIncome: false, selectedDay: $selectedDay)
-                            .environment(\.managedObjectContext, viewContext)
-                            .environmentObject(netIncomeManager)
-                    }
+                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
+                    .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .automatic))
                 }
-                .padding(.horizontal)
-                .padding(.bottom, 10)
-
-                // Give the TabView a consistent background
-                TabView(selection: $selectedDay) {
-                    ForEach(days, id: \.self) { day in
-                        VStack(alignment: .leading) {
-                            Text(day)
-                                .font(.largeTitle)
-                                .bold()
-                                .padding(.bottom, 10)
-
-                            TransactionListView(day: day, transactions: transactionsForDay(day))
-                                .listStyle(PlainListStyle()) // Plain list avoids inset backgrounds
-                        }
-                        // Add a background matching system background
-                        .background(Color(.systemBackground))
-                        .padding()
-                        .tag(day)
-                    }
-                }
-                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
-                // If the background dots look off, try changing displayMode
-                // or remove this line if not needed.
-                .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .automatic))
             }
-            .background(Color(.systemBackground)) // Ensure the entire view matches system background
             .navigationBarTitle("My Finance", displayMode: .inline)
             .navigationBarItems(
                 leading: HStack(spacing: 20) {
@@ -156,8 +153,6 @@ struct TransactionsView: View {
             .accentColor(.purple)
         }
     }
-
-    // MARK: - Helper Methods
 
     private func transactionsForDay(_ day: String) -> [Transaction] {
         transactions.filter { $0.dayOfWeek == day }

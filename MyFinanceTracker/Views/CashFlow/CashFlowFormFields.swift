@@ -7,42 +7,8 @@ struct CashFlowFormFields: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            // Name Field
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Name")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                HStack {
-                    Image(systemName: "person")
-                        .foregroundColor(.secondary)
-                    TextField("Enter name", text: $name)
-                        .textFieldStyle(PlainTextFieldStyle())
-                }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color(UIColor.secondarySystemBackground))
-                )
-            }
-
-            // Amount Field
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Amount")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                HStack {
-                    Image(systemName: "dollarsign.circle")
-                        .foregroundColor(.secondary)
-                    TextField("Enter amount", text: $amount)
-                        .keyboardType(.decimalPad)
-                        .textFieldStyle(PlainTextFieldStyle())
-                }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color(UIColor.secondarySystemBackground))
-                )
-            }
+            formField(title: "Name", icon: "person", text: $name, keyboardType: .default)
+            formField(title: "Amount", icon: "dollarsign.circle", text: $amount, keyboardType: .decimalPad)
 
             // Cash Flow Type Picker
             VStack(alignment: .leading, spacing: 5) {
@@ -53,7 +19,7 @@ struct CashFlowFormFields: View {
                     Label("Owed to Me", systemImage: "arrow.down.circle.fill").tag(true)
                     Label("I Owe", systemImage: "arrow.up.circle.fill").tag(false)
                 }
-                .pickerStyle(SegmentedPickerStyle())
+                .pickerStyle(.segmented)
                 .tint(.accentColor)
             }
         }
@@ -64,5 +30,26 @@ struct CashFlowFormFields: View {
                 .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 3)
         )
         .padding(.vertical, 10)
+    }
+
+    @ViewBuilder
+    private func formField(title: String, icon: String, text: Binding<String>, keyboardType: UIKeyboardType) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.headline)
+                .foregroundColor(.primary)
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(.secondary)
+                TextField("Enter \(title.lowercased())", text: text)
+                    .keyboardType(keyboardType)
+                    .textFieldStyle(PlainTextFieldStyle())
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(UIColor.secondarySystemBackground))
+            )
+        }
     }
 }

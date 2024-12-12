@@ -9,7 +9,6 @@ struct NetIncomeView: View {
                 .font(.title2)
                 .bold()
             Spacer()
-            // NavigationLink makes the net income figure tappable
             NavigationLink(destination: AdjustNetIncomeView()) {
                 Text("$\(String(format: "%.2f", netIncomeManager.netIncome))")
                     .font(.title2)
