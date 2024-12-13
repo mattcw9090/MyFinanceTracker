@@ -14,14 +14,17 @@ struct TransactionRowView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(transaction.desc ?? "No Description")
                     .font(.system(size: 16, weight: .semibold))
+                    .accessibilityIdentifier("transactionDescription")
                 Text(transaction.isIncome ? "Income" : "Expense")
                     .font(.system(size: 14))
                     .foregroundColor(.gray)
+                    .accessibilityIdentifier("transactionType")
             }
             Spacer()
             Text(formattedAmount())
                 .foregroundColor(transaction.isIncome ? .green : .red)
                 .font(.system(size: 16, weight: .bold))
+                .accessibilityIdentifier("transactionAmount")
 
             HStack(spacing: 12) {
                 Button(action: markAsComplete) {
@@ -29,22 +32,25 @@ struct TransactionRowView: View {
                         .foregroundColor(.blue)
                         .imageScale(.large)
                 }
+                .accessibilityIdentifier("markCompleteButton")
+
                 Button(action: onDelete) {
                     Image(systemName: "trash.circle.fill")
                         .foregroundColor(.red)
                         .imageScale(.large)
                 }
+                .accessibilityIdentifier("deleteButton")
             }
             .buttonStyle(BorderlessButtonStyle())
         }
-        .padding()
+        .padding(.horizontal, 15)
+        .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(UIColor.secondarySystemBackground))
                 .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 3)
         )
-        .padding(.vertical, 8)
-        .padding(.horizontal, 8)
+        .padding(.vertical, 10)
         .alert(isPresented: $showAddToCashFlowConfirmation) {
             Alert(
                 title: Text("Add to Cash Flow"),

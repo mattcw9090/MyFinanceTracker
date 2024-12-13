@@ -1,7 +1,7 @@
 import SwiftUI
 import CoreData
 
-struct TransactionsView: View {
+struct NetIncomeTabView: View {
     enum ActiveAlert: Identifiable {
         case reset, initializeWeek, success, noPredefinedTransactions
         var id: Int { hashValue }
@@ -15,8 +15,7 @@ struct TransactionsView: View {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "EEEE"
-        let today = formatter.string(from: Date())
-        return ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].contains(today) ? today : "Monday"
+        return formatter.string(from: Date())
     }()
     @State private var activeAlert: ActiveAlert?
 
@@ -54,6 +53,7 @@ struct TransactionsView: View {
                             .cornerRadius(10)
                             .shadow(radius: 2)
                         }
+                        .accessibilityIdentifier("addIncomeButton")
                         .sheet(isPresented: $showingAddIncome) {
                             AddTransactionView(isIncome: true, selectedDay: $selectedDay)
                                 .environment(\.managedObjectContext, viewContext)
@@ -72,6 +72,7 @@ struct TransactionsView: View {
                             .cornerRadius(10)
                             .shadow(radius: 2)
                         }
+                        .accessibilityIdentifier("addExpenseButton")
                         .sheet(isPresented: $showingAddExpense) {
                             AddTransactionView(isIncome: false, selectedDay: $selectedDay)
                                 .environment(\.managedObjectContext, viewContext)
@@ -89,6 +90,7 @@ struct TransactionsView: View {
                                     .font(.largeTitle)
                                     .bold()
                                     .padding(.bottom, 10)
+                                    .accessibilityIdentifier("selectedDay")
 
                                 TransactionListView(day: day, transactions: transactionsForDay(day))
                                     .listStyle(PlainListStyle())
@@ -97,6 +99,7 @@ struct TransactionsView: View {
                             .padding()
                             .tag(day)
                         }
+
                     }
                     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
                     .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .automatic))
@@ -110,14 +113,14 @@ struct TransactionsView: View {
                             .imageScale(.large)
                             .foregroundColor(.red)
                     }
-                    .accessibilityLabel("Reset")
+                    .accessibilityIdentifier("resetButton")
 
                     Button(action: { activeAlert = .initializeWeek }) {
                         Image(systemName: "calendar.badge.plus")
                             .imageScale(.large)
                             .foregroundColor(.blue)
                     }
-                    .accessibilityLabel("Initialize Week")
+                    .accessibilityIdentifier("initializeWeekButton")
                 }
             )
             .alert(item: $activeAlert) { alertType in

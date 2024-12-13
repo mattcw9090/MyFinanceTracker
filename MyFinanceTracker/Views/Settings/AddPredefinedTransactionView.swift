@@ -27,10 +27,12 @@ struct AddPredefinedTransactionView: View {
                 Form {
                     Section(header: Text("Description").font(.headline)) {
                         TextField("Enter description", text: $descriptionText)
+                            .accessibilityIdentifier("AddPredefined_DescriptionTextField")
                     }
                     Section(header: Text("Amount").font(.headline)) {
                         TextField("Enter amount", text: $amount)
                             .keyboardType(.decimalPad)
+                            .accessibilityIdentifier("AddPredefined_AmountTextField")
                             .onReceive(amount.publisher.collect()) { newValue in
                                 let filtered = newValue.filter { "0123456789.".contains($0) }
                                 if filtered != newValue {
@@ -44,7 +46,8 @@ struct AddPredefinedTransactionView: View {
                                 Text(day)
                             }
                         }
-                        .pickerStyle(MenuPickerStyle())
+                        .pickerStyle(WheelPickerStyle())
+                        .accessibilityIdentifier("AddPredefined_DayPicker")
                     }
                     Section(header: Text("Transaction Type").font(.headline)) {
                         Picker("Type", selection: $isIncome) {
@@ -52,6 +55,7 @@ struct AddPredefinedTransactionView: View {
                             Text("Expense").tag(false)
                         }
                         .pickerStyle(SegmentedPickerStyle())
+                        .accessibilityIdentifier("AddPredefined_TypePicker")
                     }
                 }
                 .scrollContentBackground(.hidden)
@@ -59,8 +63,10 @@ struct AddPredefinedTransactionView: View {
             }
             .navigationBarTitle("Add Predefined Transaction", displayMode: .inline)
             .navigationBarItems(
-                leading: Button("Cancel") { dismiss() },
+                leading: Button("Cancel") { dismiss() }
+                    .accessibilityIdentifier("AddPredefined_CancelButton"),
                 trailing: Button("Save") { addPredefinedTransaction() }
+                    .accessibilityIdentifier("AddPredefined_SaveButton")
                     .disabled(!isFormValid())
             )
             .alert(isPresented: $showAlert) {

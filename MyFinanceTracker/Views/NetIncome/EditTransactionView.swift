@@ -33,12 +33,14 @@ struct EditTransactionView: View {
                 Section(header: Text("Description").font(.headline)) {
                     TextField("Enter description", text: $descriptionText)
                         .padding(.vertical, 8)
+                        .accessibilityIdentifier("descriptionField")
                 }
 
                 Section(header: Text("Amount").font(.headline)) {
                     TextField("Enter amount", text: $amount)
                         .keyboardType(.decimalPad)
                         .padding(.vertical, 8)
+                        .accessibilityIdentifier("amountField")
                         .onReceive(amount.publisher.collect()) { newValue in
                             let filtered = newValue.filter { "0123456789.".contains($0) }
                             if filtered != newValue {
@@ -55,6 +57,7 @@ struct EditTransactionView: View {
                     }
                     .pickerStyle(WheelPickerStyle())
                     .frame(height: 150)
+                    .accessibilityIdentifier("EditTransaction_DayPicker")
                 }
 
                 Section(header: Text("Transaction Type").font(.headline)) {
@@ -64,16 +67,19 @@ struct EditTransactionView: View {
                     }
                     .pickerStyle(SegmentedPickerStyle())
                     .tint(.accentColor)
+                    .accessibilityIdentifier("editTransactionTypePicker")
                 }
             }
             .navigationBarTitle("Edit Transaction", displayMode: .inline)
             .navigationBarItems(
-                leading: Button("Cancel") { dismiss() },
+                leading: Button("Cancel") { dismiss() }
+                    .accessibilityIdentifier("editCancelButton"),
                 trailing: Button("Save") {
                     editTransaction()
                     dismiss()
                 }
                 .disabled(!isFormValid())
+                .accessibilityIdentifier("saveButton")
             )
             .alert(isPresented: $showAlert) {
                 Alert(title: Text("Error"),

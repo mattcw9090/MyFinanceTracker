@@ -35,6 +35,7 @@ struct AdjustNetIncomeView: View {
                 .pickerStyle(SegmentedPickerStyle())
                 .padding(.horizontal)
                 .tint(.accentColor)
+                .accessibilityIdentifier("operationPicker")
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("AMOUNT")
@@ -46,13 +47,10 @@ struct AdjustNetIncomeView: View {
                         .padding()
                         .background(Color(UIColor.secondarySystemBackground))
                         .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.gray.opacity(0.5), lineWidth: 1)
-                        )
+                        .accessibilityIdentifier("adjustAmountField")
                         .focused($isAmountFieldFocused)
                 }
-                .padding(.horizontal)
+                .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 16)
                         .fill(Color(UIColor.systemBackground))
@@ -71,6 +69,7 @@ struct AdjustNetIncomeView: View {
                             .cornerRadius(8)
                             .shadow(radius: 2)
                     }
+                    .accessibilityIdentifier("confirmButton")
 
                     Button(action: { dismiss() }) {
                         Text("Cancel")
@@ -82,6 +81,7 @@ struct AdjustNetIncomeView: View {
                             .cornerRadius(8)
                             .shadow(radius: 2)
                     }
+                    .accessibilityIdentifier("adjustCancelButton")
                 }
                 .padding(.horizontal)
 

@@ -1,7 +1,7 @@
 import SwiftUI
 import CoreData
 
-struct SettingsView: View {
+struct SettingsTabView: View {
     @Environment(\.managedObjectContext) private var viewContext
 
     @FetchRequest(
@@ -38,7 +38,9 @@ struct SettingsView: View {
                     // Predefined Transactions Section
                     Section(header: SectionHeader(title: "Predefined Transactions") {
                         showingAddPredefinedTransaction = true
-                    }) {
+                    }
+                    .accessibilityIdentifier("AddPredefined_SectionHeader")
+                    ) {
                         if predefinedTransactions.isEmpty {
                             EmptyStateView(message: "No predefined transactions. Add some to get started.", systemImage: "tray")
                                 .listRowSeparator(.hidden)
@@ -48,9 +50,9 @@ struct SettingsView: View {
                                 let transactionsForDay = predefinedTransactions.filter { $0.dayOfWeek == day }
                                 if !transactionsForDay.isEmpty {
                                     Text(day)
-                                        .font(.title3)
+                                        .font(.system(size: 15))
                                         .fontWeight(.bold)
-                                        .foregroundColor(.primary)
+                                        .padding(.horizontal, 16)
                                         .padding(.vertical, 8)
                                         .listRowSeparator(.visible)
                                         .listRowInsets(EdgeInsets())
@@ -76,7 +78,9 @@ struct SettingsView: View {
                     // Quick Add Transactions Section
                     Section(header: SectionHeader(title: "Quick Add Transactions") {
                         showingAddQuickAddTransaction = true
-                    }) {
+                    }
+                    .accessibilityIdentifier("AddQuickAdd_SectionHeader")
+                    ) {
                         if quickAddTransactions.isEmpty {
                             EmptyStateView(message: "No quick add transactions. Add some to get started.", systemImage: "plus.circle")
                                 .listRowSeparator(.hidden)
@@ -87,9 +91,10 @@ struct SettingsView: View {
 
                             if !incomeQuickAddTransactions.isEmpty {
                                 Text("Income")
-                                    .font(.title3)
+                                    .font(.system(size: 15))
                                     .fontWeight(.bold)
                                     .foregroundColor(.green)
+                                    .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
                                     .listRowSeparator(.visible)
                                     .listRowInsets(EdgeInsets())
@@ -111,9 +116,10 @@ struct SettingsView: View {
 
                             if !expenseQuickAddTransactions.isEmpty {
                                 Text("Expense")
-                                    .font(.title3)
+                                    .font(.system(size: 15))
                                     .fontWeight(.bold)
                                     .foregroundColor(.red)
+                                    .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
                                     .listRowSeparator(.visible)
                                     .listRowInsets(EdgeInsets())

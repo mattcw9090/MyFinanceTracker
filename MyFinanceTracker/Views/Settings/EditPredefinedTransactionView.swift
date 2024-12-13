@@ -37,10 +37,12 @@ struct EditPredefinedTransactionView: View {
                 Form {
                     Section(header: Text("Description").font(.headline)) {
                         TextField("Enter description", text: $descriptionText)
+                            .accessibilityIdentifier("EditPredefined_DescriptionTextField")
                     }
                     Section(header: Text("Amount").font(.headline)) {
                         TextField("Enter amount", text: $amount)
                             .keyboardType(.decimalPad)
+                            .accessibilityIdentifier("EditPredefined_AmountTextField")
                             .onReceive(amount.publisher.collect()) { newValue in
                                 let filtered = newValue.filter { "0123456789.".contains($0) }
                                 if filtered != newValue {
@@ -52,9 +54,11 @@ struct EditPredefinedTransactionView: View {
                         Picker("Select Day", selection: $selectedDay) {
                             ForEach(days, id: \.self) { day in
                                 Text(day)
+                                    .accessibilityIdentifier("EditPredefined_DayPicker_\(day)")
                             }
                         }
-                        .pickerStyle(MenuPickerStyle())
+                        .pickerStyle(WheelPickerStyle())
+                        .accessibilityIdentifier("EditPredefined_DayPicker")
                     }
                     Section(header: Text("Transaction Type").font(.headline)) {
                         Picker("Type", selection: $isIncome) {
@@ -62,6 +66,7 @@ struct EditPredefinedTransactionView: View {
                             Text("Expense").tag(false)
                         }
                         .pickerStyle(SegmentedPickerStyle())
+                        .accessibilityIdentifier("EditPredefined_TypePicker")
                     }
                 }
                 .scrollContentBackground(.hidden)
@@ -69,8 +74,10 @@ struct EditPredefinedTransactionView: View {
             }
             .navigationBarTitle("Edit Predefined Transaction", displayMode: .inline)
             .navigationBarItems(
-                leading: Button("Cancel") { dismiss() },
+                leading: Button("Cancel") { dismiss() }
+                    .accessibilityIdentifier("EditPredefined_CancelButton"),
                 trailing: Button("Save") { editPredefinedTransaction() }
+                    .accessibilityIdentifier("EditPredefined_SaveButton")
                     .disabled(!isFormValid())
             )
             .alert(isPresented: $showAlert) {

@@ -58,6 +58,7 @@ struct AddTransactionView: View {
                             }
                             .pickerStyle(WheelPickerStyle())
                             .frame(height: 150)
+                            .accessibilityIdentifier("AddTransaction_DayPicker")
                         }
                         .padding()
                         .background(
@@ -81,6 +82,7 @@ struct AddTransactionView: View {
                                     .background(Color(UIColor.secondarySystemBackground))
                                     .cornerRadius(8)
                                     .disableAutocorrection(true)
+                                    .accessibilityIdentifier("descriptionField")
                             }
 
                             // Amount Field
@@ -95,6 +97,7 @@ struct AddTransactionView: View {
                                     .padding(12)
                                     .background(Color(UIColor.secondarySystemBackground))
                                     .cornerRadius(8)
+                                    .accessibilityIdentifier("amountField")
                                     .onReceive(amount.publisher.collect()) { newValue in
                                         let filtered = newValue.filter { "0123456789.".contains($0) }
                                         if filtered != newValue {
@@ -141,6 +144,7 @@ struct AddTransactionView: View {
                                             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 3)
                                         }
                                         .buttonStyle(PlainButtonStyle())
+                                        .accessibilityIdentifier("quickAdd_\(transaction.desc ?? "no_desc")")
                                     }
                                 }
                                 .padding(.horizontal)
@@ -166,7 +170,8 @@ struct AddTransactionView: View {
                         Text("Cancel")
                             .fontWeight(.semibold)
                             .foregroundColor(.purple)
-                    },
+                    }
+                    .accessibilityIdentifier("cancelButton"),
                     trailing: Button(action: {
                         addTransaction()
                     }) {
@@ -181,6 +186,7 @@ struct AddTransactionView: View {
                             )
                     }
                     .disabled(!isFormValid())
+                    .accessibilityIdentifier("saveButton")
                 )
                 .alert(isPresented: $showAlert) {
                     Alert(title: Text("Error"),

@@ -8,35 +8,30 @@ struct TransactionListView: View {
     @EnvironmentObject var netIncomeManager: NetIncomeManager
 
     var body: some View {
-        List {
+        VStack {
             if transactions.isEmpty {
-                Text("No transactions for \(day).")
-                    .foregroundColor(.gray)
-                    .italic()
-                    .padding()
-                    .listRowBackground(Color.clear)
-            } else {
-                ForEach(transactions, id: \.id) { transaction in
-                    ZStack {
-                        NavigationLink(destination: EditTransactionView(transaction: transaction)
-                                        .environment(\.managedObjectContext, viewContext)
-                                        .environmentObject(netIncomeManager)) {
-                            EmptyView()
-                        }
-                        .opacity(0)
-
-                        TransactionRowView(transaction: transaction, onDelete: {
-                            deleteTransaction(transaction)
-                        })
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
+                ScrollView {
+                    VStack(spacing: 0) {
+                        Text("No transactions for \(day).")
+                            .foregroundColor(.gray)
+                            .italic()
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 25)
+                }
+            } else {
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(transactions, id: \.id) { transaction in
+                            TransactionRowView(transaction: transaction, onDelete: {
+                                deleteTransaction(transaction)
+                            })
+                        }
+                    }
+                    .padding(.horizontal, 15)
                 }
             }
         }
-        .listStyle(PlainListStyle())
-        .scrollContentBackground(.hidden)
-        .background(Color(.systemBackground))
     }
 
     private func deleteTransaction(_ transaction: Transaction) {

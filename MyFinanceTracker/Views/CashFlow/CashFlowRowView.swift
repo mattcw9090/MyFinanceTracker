@@ -1,36 +1,35 @@
 import SwiftUI
 
 struct CashFlowRowView: View {
-    @ObservedObject var item: CashFlowItem
+    var item: CashFlowItem
+    var onTap: () -> Void
 
     var body: some View {
-        HStack(spacing: 16) {
-            Image(systemName: item.isOwedToMe ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
-                .foregroundColor(item.isOwedToMe ? .green : .red)
-                .font(.title2)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.name ?? "No Name")
+        Button(action: onTap) {
+            HStack {
+                VStack(alignment: .leading) {
+                    Text(item.name ?? "Unnamed")
+                        .font(.headline)
+                        .accessibilityIdentifier("cashFlowName")
+                    Text(item.isOwedToMe ? "Owed to Me" : "I Owe")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .accessibilityIdentifier("cashFlowType")
+                }
+                Spacer()
+                Text(formattedAmount())
                     .font(.headline)
-                Text(item.isOwedToMe ? "Owed to me" : "I owe")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(item.isOwedToMe ? .green : .red)
+                    .accessibilityIdentifier("cashFlowAmount")
             }
-
-            Spacer()
-
-            Text("$\(String(format: "%.2f", item.amount))")
-                .foregroundColor(.primary)
-                .fontWeight(.bold)
-                .font(.title3)
+            .padding(.horizontal, 8)
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(UIColor.systemBackground))
-                .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
-        )
-        .padding(.vertical, 4)
-        .padding(.horizontal, 8)
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    private func formattedAmount() -> String {
+        let amount = item.amount
+        let formatted = String(format: "$%.2f", item.isOwedToMe ? amount : -amount)
+        return formatted
     }
 }

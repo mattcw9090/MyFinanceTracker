@@ -8,12 +8,14 @@ struct NetIncomeView: View {
             Text("Net Income:")
                 .font(.title2)
                 .bold()
+                .accessibilityIdentifier("netIncomeLabel")
             Spacer()
             NavigationLink(destination: AdjustNetIncomeView()) {
                 Text("$\(String(format: "%.2f", netIncomeManager.netIncome))")
                     .font(.title2)
                     .bold()
                     .foregroundColor(netIncomeManager.netIncome >= 0 ? .green : .red)
+                    .accessibilityIdentifier("netIncomeValue")
             }
         }
         .padding()

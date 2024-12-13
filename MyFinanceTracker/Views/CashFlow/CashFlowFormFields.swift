@@ -21,6 +21,7 @@ struct CashFlowFormFields: View {
                 }
                 .pickerStyle(.segmented)
                 .tint(.accentColor)
+                .accessibilityIdentifier("cashFlowTypePicker")
             }
         }
         .padding()

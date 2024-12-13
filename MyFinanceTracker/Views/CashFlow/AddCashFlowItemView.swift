@@ -36,6 +36,7 @@ struct AddCashFlowItemView: View {
                         .foregroundColor(.primary)
 
                     CashFlowFormFields(name: $name, amount: $amount, isOwedToMe: $isOwedToMe)
+                        .padding(.horizontal)
 
                     Button(action: addCashFlowItem) {
                         Text("Save")

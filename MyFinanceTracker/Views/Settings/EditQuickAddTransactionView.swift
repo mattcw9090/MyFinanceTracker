@@ -33,10 +33,12 @@ struct EditQuickAddTransactionView: View {
                 Form {
                     Section(header: Text("Description").font(.headline)) {
                         TextField("Enter description", text: $descriptionText)
+                            .accessibilityIdentifier("EditQuickAdd_DescriptionTextField")
                     }
                     Section(header: Text("Amount").font(.headline)) {
                         TextField("Enter amount", text: $amount)
                             .keyboardType(.decimalPad)
+                            .accessibilityIdentifier("EditQuickAdd_AmountTextField")
                             .onReceive(amount.publisher.collect()) { newValue in
                                 let filtered = newValue.filter { "0123456789.".contains($0) }
                                 if filtered != newValue {
@@ -50,6 +52,7 @@ struct EditQuickAddTransactionView: View {
                             Text("Expense").tag(false)
                         }
                         .pickerStyle(SegmentedPickerStyle())
+                        .accessibilityIdentifier("EditQuickAdd_TypePicker")
                     }
                 }
                 .scrollContentBackground(.hidden)
@@ -57,8 +60,10 @@ struct EditQuickAddTransactionView: View {
             }
             .navigationBarTitle("Edit Quick Add Transaction", displayMode: .inline)
             .navigationBarItems(
-                leading: Button("Cancel") { dismiss() },
+                leading: Button("Cancel") { dismiss() }
+                    .accessibilityIdentifier("EditQuickAdd_CancelButton"),
                 trailing: Button("Save") { editQuickAddTransaction() }
+                    .accessibilityIdentifier("EditQuickAdd_SaveButton")
                     .disabled(!isFormValid())
             )
             .alert(isPresented: $showAlert) {

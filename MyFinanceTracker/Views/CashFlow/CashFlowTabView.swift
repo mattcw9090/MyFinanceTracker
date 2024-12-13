@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct CashFlowView: View {
+struct CashFlowTabView: View {
     @Environment(\.managedObjectContext) private var viewContext
 
     @FetchRequest(
@@ -39,7 +39,8 @@ struct CashFlowView: View {
                         )
                     }
                     .listStyle(.plain)
-                    .scrollContentBackground(.hidden) // Removes default background
+                    .scrollContentBackground(.hidden)
+                    .accessibilityIdentifier("cashFlowListView")
                 }
             }
             .navigationBarTitle("Cash Flow", displayMode: .inline)
@@ -99,21 +100,22 @@ struct CashFlowView: View {
                     .listRowBackground(Color.clear)
             } else {
                 ForEach(items, id: \.objectID) { item in
-                    CashFlowRowView(item: item)
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                        .onTapGesture { cashFlowItemToEdit = item }
-                        .swipeActions {
-                            Button(role: .destructive) { delete(item) } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                            Button {
-                                cashFlowItemToEdit = item
-                            } label: {
-                                Label("Edit", systemImage: "pencil")
-                            }
-                            .tint(.orange)
+                    CashFlowRowView(item: item) {
+                        cashFlowItemToEdit = item
+                    }
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .swipeActions {
+                        Button(role: .destructive) { delete(item) } label: {
+                            Label("Delete", systemImage: "trash")
                         }
+                        Button {
+                            cashFlowItemToEdit = item
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        .tint(.orange)
+                    }
                 }
             }
         }
