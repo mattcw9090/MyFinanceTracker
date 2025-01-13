@@ -76,7 +76,6 @@ struct EditTransactionView: View {
                     .accessibilityIdentifier("editCancelButton"),
                 trailing: Button("Save") {
                     editTransaction()
-                    dismiss()
                 }
                 .disabled(!isFormValid())
                 .accessibilityIdentifier("saveButton")
@@ -99,6 +98,8 @@ struct EditTransactionView: View {
     }
 
     private func editTransaction() {
+        guard isFormValid() else { return }
+
         let oldAmount = transaction.amount
         let newAmount = Double(amount) ?? 0.0
         let wasIncome = transaction.isIncome
@@ -108,11 +109,13 @@ struct EditTransactionView: View {
         transaction.dayOfWeek = selectedDay
         transaction.isIncome = isIncome
 
+        // Adjust net income
         netIncomeManager.adjustNetIncome(by: oldAmount, isIncome: wasIncome, isDeletion: true)
         netIncomeManager.adjustNetIncome(by: newAmount, isIncome: isIncome, isDeletion: false)
 
         do {
             try viewContext.save()
+            dismiss()
         } catch {
             alertMessage = "Failed to edit transaction: \(error.localizedDescription)"
             showAlert = true

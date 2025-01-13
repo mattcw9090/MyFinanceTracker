@@ -23,9 +23,13 @@ struct TransactionListView: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         ForEach(transactions, id: \.id) { transaction in
-                            TransactionRowView(transaction: transaction, onDelete: {
-                                deleteTransaction(transaction)
-                            })
+                            NavigationLink(destination: EditTransactionView(transaction: transaction)
+                                            .environmentObject(netIncomeManager)) {
+                                TransactionRowView(transaction: transaction, onDelete: {
+                                    deleteTransaction(transaction)
+                                })
+                            }
+                            .buttonStyle(PlainButtonStyle())
                         }
                     }
                     .padding(.horizontal, 15)

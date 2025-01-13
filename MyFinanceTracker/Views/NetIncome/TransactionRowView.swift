@@ -57,38 +57,49 @@ struct TransactionRowView: View {
                 message: Text("Do you want to add this completed income transaction to the 'Who owes me' section?"),
                 primaryButton: .default(Text("Yes")) {
                     addToCashFlow()
-                    saveContext()
+                    toggleIsCompleted()
                 },
                 secondaryButton: .default(Text("No")) {
-                    saveContext()
+                    toggleIsCompleted()
                 }
             )
         }
     }
 
+    /// Formats the transaction amount for display.
     private func formattedAmount() -> String {
         let amount = transaction.amount
         let formattedAmount = String(format: "%.2f", transaction.isIncome ? amount : -amount)
         return "$\(formattedAmount)"
     }
 
+    /// Handles the action when the "Mark as Complete" button is tapped.
     private func markAsComplete() {
-        transaction.isCompleted.toggle()
         if transaction.isIncome {
+            // Show confirmation alert for income transactions.
             showAddToCashFlowConfirmation = true
         } else {
-            saveContext()
+            // Directly mark as complete for expense transactions.
+            toggleIsCompleted()
         }
     }
 
+    /// Toggles the `isCompleted` property and saves the context.
+    private func toggleIsCompleted() {
+        transaction.isCompleted.toggle()
+        saveContext()
+    }
+
+    /// Adds the transaction to the cash flow section.
     private func addToCashFlow() {
         let cashFlowItem = CashFlowItem(context: viewContext)
         cashFlowItem.id = UUID()
-        cashFlowItem.name = transaction.desc
+        cashFlowItem.name = transaction.desc ?? "Unnamed Transaction"
         cashFlowItem.amount = transaction.amount
         cashFlowItem.isOwedToMe = true
     }
 
+    /// Saves the current state of the managed object context.
     private func saveContext() {
         do {
             try viewContext.save()
