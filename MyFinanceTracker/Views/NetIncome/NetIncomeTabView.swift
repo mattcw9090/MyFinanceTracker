@@ -2,6 +2,9 @@ import SwiftUI
 import CoreData
 
 struct NetIncomeTabView: View {
+    @Environment(\.managedObjectContext) private var viewContext
+    @EnvironmentObject var netIncomeManager: NetIncomeManager
+    
     enum ActiveAlert: Identifiable {
         case reset, initializeWeek, success, noPredefinedTransactions
         var id: Int { hashValue }
@@ -18,8 +21,7 @@ struct NetIncomeTabView: View {
         return formatter.string(from: Date())
     }()
     @State private var activeAlert: ActiveAlert?
-
-    @Environment(\.managedObjectContext) private var viewContext
+    
     @FetchRequest(
         entity: Transaction.entity(),
         sortDescriptors: [NSSortDescriptor(keyPath: \Transaction.dayOfWeek, ascending: true)],
@@ -27,8 +29,6 @@ struct NetIncomeTabView: View {
         animation: .default
     )
     private var transactions: FetchedResults<Transaction>
-
-    @EnvironmentObject var netIncomeManager: NetIncomeManager
 
     var body: some View {
         NavigationView {
