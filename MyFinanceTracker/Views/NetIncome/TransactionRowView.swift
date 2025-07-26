@@ -6,6 +6,8 @@ struct TransactionRowView: View {
     @Environment(\.managedObjectContext) private var viewContext
 
     @State private var showAddToCashFlowConfirmation = false
+    @State private var showAdditionalCostInput = false
+    @State private var additionalCostString: String = ""
 
     var onDelete: () -> Void
 
@@ -56,13 +58,35 @@ struct TransactionRowView: View {
                 title: Text("Add to Cash Flow"),
                 message: Text("Do you want to add this completed income transaction to the 'Who owes me' section?"),
                 primaryButton: .default(Text("Yes")) {
-                    addToCashFlow()
-                    toggleIsCompleted()
+                    // Show input for additional cost
+                    showAdditionalCostInput = true
                 },
-                secondaryButton: .default(Text("No")) {
+                secondaryButton: .cancel {
                     toggleIsCompleted()
                 }
             )
+        }
+        .sheet(isPresented: $showAdditionalCostInput) {
+            NavigationView {
+                Form {
+                    Section(header: Text("Additional Court Cost")) {
+                        TextField("Enter amount", text: $additionalCostString)
+                            .keyboardType(.decimalPad)
+                    }
+                }
+                .navigationBarTitle("Add Court Cost", displayMode: .inline)
+                .navigationBarItems(
+                    leading: Button("Cancel") {
+                        showAdditionalCostInput = false
+                        toggleIsCompleted()
+                    },
+                    trailing: Button("Add") {
+                        addToCashFlow()
+                        toggleIsCompleted()
+                        showAdditionalCostInput = false
+                    }
+                )
+            }
         }
     }
 
@@ -90,13 +114,16 @@ struct TransactionRowView: View {
         saveContext()
     }
 
-    /// Adds the transaction to the cash flow section.
+    /// Adds the transaction to the cash flow section, including any additional cost.
     private func addToCashFlow() {
         let cashFlowItem = CashFlowItem(context: viewContext)
         cashFlowItem.id = UUID()
         cashFlowItem.name = transaction.desc ?? "Unnamed Transaction"
-        cashFlowItem.amount = transaction.amount
+        // Parse additional cost and add to transaction amount
+        let extra = Double(additionalCostString) ?? 0
+        cashFlowItem.amount = transaction.amount + extra
         cashFlowItem.isOwedToMe = true
+        saveContext()
     }
 
     /// Saves the current state of the managed object context.
