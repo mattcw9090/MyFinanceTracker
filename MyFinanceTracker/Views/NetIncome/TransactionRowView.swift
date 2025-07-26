@@ -8,6 +8,7 @@ struct TransactionRowView: View {
     @State private var showAddToCashFlowConfirmation = false
     @State private var showAdditionalCostInput = false
     @State private var additionalCostString: String = ""
+    @State private var splitNames: [String] = []
 
     var onDelete: () -> Void
 
@@ -58,7 +59,6 @@ struct TransactionRowView: View {
                 title: Text("Add to Cash Flow"),
                 message: Text("Do you want to add this completed income transaction to the 'Who owes me' section?"),
                 primaryButton: .default(Text("Yes")) {
-                    // Show input for additional cost
                     showAdditionalCostInput = true
                 },
                 secondaryButton: .cancel {
@@ -72,6 +72,17 @@ struct TransactionRowView: View {
                     Section(header: Text("Additional Court Cost")) {
                         TextField("Enter amount", text: $additionalCostString)
                             .keyboardType(.decimalPad)
+                    }
+                    Section(header: Text("Split")) {
+                        // Only an Add button; entries with blank names are ignored
+                        Button(action: {
+                            splitNames.append("")
+                        }) {
+                            Label("Add Person", systemImage: "plus.circle")
+                        }
+                        ForEach(splitNames.indices, id: \.self) { index in
+                            TextField("Name", text: $splitNames[index])
+                        }
                     }
                 }
                 .navigationBarTitle("Add Court Cost", displayMode: .inline)
@@ -94,16 +105,14 @@ struct TransactionRowView: View {
     private func formattedAmount() -> String {
         let amount = transaction.amount
         let formattedAmount = String(format: "%.2f", transaction.isIncome ? amount : -amount)
-        return "$\(formattedAmount)"
+        return "\(transaction.isIncome ? "$" : "-$")\(formattedAmount)"
     }
 
     /// Handles the action when the "Mark as Complete" button is tapped.
     private func markAsComplete() {
         if transaction.isIncome {
-            // Show confirmation alert for income transactions.
             showAddToCashFlowConfirmation = true
         } else {
-            // Directly mark as complete for expense transactions.
             toggleIsCompleted()
         }
     }
@@ -114,15 +123,30 @@ struct TransactionRowView: View {
         saveContext()
     }
 
-    /// Adds the transaction to the cash flow section, including any additional cost.
+    /// Adds the transaction to the cash flow section, splitting among names if provided.
     private func addToCashFlow() {
-        let cashFlowItem = CashFlowItem(context: viewContext)
-        cashFlowItem.id = UUID()
-        cashFlowItem.name = transaction.desc ?? "Unnamed Transaction"
-        // Parse additional cost and add to transaction amount
         let extra = Double(additionalCostString) ?? 0
-        cashFlowItem.amount = transaction.amount + extra
-        cashFlowItem.isOwedToMe = true
+        let total = transaction.amount + extra
+        let names = splitNames
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        let share = names.isEmpty ? total : total / Double(names.count)
+
+        if names.isEmpty {
+            let item = CashFlowItem(context: viewContext)
+            item.id = UUID()
+            item.name = transaction.desc ?? "Unnamed Transaction"
+            item.amount = total
+            item.isOwedToMe = true
+        } else {
+            for name in names {
+                let item = CashFlowItem(context: viewContext)
+                item.id = UUID()
+                item.name = name
+                item.amount = share
+                item.isOwedToMe = true
+            }
+        }
         saveContext()
     }
 
