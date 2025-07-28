@@ -103,8 +103,8 @@ struct TransactionRowView: View {
 
     /// Formats the transaction amount for display.
     private func formattedAmount() -> String {
-        let amount = transaction.amount
-        let formattedAmount = String(format: "%.2f", transaction.isIncome ? amount : -amount)
+        let amount = abs(transaction.amount)
+        let formattedAmount = String(format: "%.2f", amount)
         return "\(transaction.isIncome ? "$" : "-$")\(formattedAmount)"
     }
 

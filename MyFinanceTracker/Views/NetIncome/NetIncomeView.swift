@@ -11,7 +11,7 @@ struct NetIncomeView: View {
                 .accessibilityIdentifier("netIncomeLabel")
             Spacer()
             NavigationLink(destination: AdjustNetIncomeView()) {
-                Text("$\(String(format: "%.2f", netIncomeManager.netIncome))")
+                Text(formattedNetIncome())
                     .font(.title2)
                     .bold()
                     .foregroundColor(netIncomeManager.netIncome >= 0 ? .green : .red)
@@ -24,5 +24,12 @@ struct NetIncomeView: View {
         .shadow(radius: 2)
         .padding(.horizontal)
         .padding(.bottom, 16)
+    }
+
+    /// Formats the net income value, ensuring no double negative.
+    private func formattedNetIncome() -> String {
+        let amount = abs(netIncomeManager.netIncome)
+        let prefix = netIncomeManager.netIncome >= 0 ? "$" : "-$"
+        return "\(prefix)\(String(format: "%.2f", amount))"
     }
 }

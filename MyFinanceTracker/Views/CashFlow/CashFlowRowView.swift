@@ -28,8 +28,8 @@ struct CashFlowRowView: View {
     }
 
     private func formattedAmount() -> String {
-        let amount = item.amount
-        let formatted = String(format: "$%.2f", item.isOwedToMe ? amount : -amount)
-        return formatted
+        let amount = abs(item.amount)
+        let prefix = item.isOwedToMe ? "$" : "-$"
+        return "\(prefix)\(String(format: "%.2f", amount))"
     }
 }

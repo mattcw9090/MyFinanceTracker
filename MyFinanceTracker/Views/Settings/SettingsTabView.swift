@@ -254,8 +254,9 @@ struct SettingsTabView: View {
         }
 
         private func formattedAmount(transaction: PredefinedTransaction) -> String {
-            let amount = transaction.isIncome ? transaction.amount : -transaction.amount
-            return String(format: "$%.2f", amount)
+            let amount = abs(transaction.amount)
+            let prefix = transaction.isIncome ? "$" : "-$"
+            return "\(prefix)\(String(format: "%.2f", amount))"
         }
     }
 
@@ -298,8 +299,9 @@ struct SettingsTabView: View {
         }
 
         private func formattedAmount(transaction: QuickAddTransaction) -> String {
-            let amount = transaction.isIncome ? transaction.amount : -transaction.amount
-            return String(format: "$%.2f", amount)
+            let amount = abs(transaction.amount)
+            let prefix = transaction.isIncome ? "$" : "-$"
+            return "\(prefix)\(String(format: "%.2f", amount))"
         }
     }
 
