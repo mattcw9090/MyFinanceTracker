@@ -18,9 +18,11 @@ struct SettingsTabView: View {
 
     @State private var showingAddPredefinedTransaction = false
     @State private var predefinedTransactionToEdit: PredefinedTransaction?
-
     @State private var showingAddQuickAddTransaction = false
     @State private var quickAddTransactionToEdit: QuickAddTransaction?
+
+    /// Trigger for refreshing the List when edits complete
+    @State private var refreshID = UUID()
 
     let daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -35,16 +37,21 @@ struct SettingsTabView: View {
                 .ignoresSafeArea()
 
                 List {
-                    // Predefined Transactions Section
-                    Section(header: SectionHeader(title: "Predefined Transactions") {
-                        showingAddPredefinedTransaction = true
-                    }
-                    .accessibilityIdentifier("AddPredefined_SectionHeader")
+                    // MARK: Predefined Transactions Section
+                    Section(
+                        header:
+                            SectionHeader(title: "Predefined Transactions") {
+                                showingAddPredefinedTransaction = true
+                            }
+                            .accessibilityIdentifier("AddPredefined_SectionHeader")
                     ) {
                         if predefinedTransactions.isEmpty {
-                            EmptyStateView(message: "No predefined transactions. Add some to get started.", systemImage: "tray")
-                                .listRowSeparator(.hidden)
-                                .listRowBackground(Color.clear)
+                            EmptyStateView(
+                                message: "No predefined transactions. Add some to get started.",
+                                systemImage: "tray"
+                            )
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
                         } else {
                             ForEach(daysOfWeek, id: \.self) { day in
                                 let transactionsForDay = predefinedTransactions.filter { $0.dayOfWeek == day }
@@ -75,16 +82,21 @@ struct SettingsTabView: View {
                         }
                     }
 
-                    // Quick Add Transactions Section
-                    Section(header: SectionHeader(title: "Quick Add Transactions") {
-                        showingAddQuickAddTransaction = true
-                    }
-                    .accessibilityIdentifier("AddQuickAdd_SectionHeader")
+                    // MARK: Quick Add Transactions Section
+                    Section(
+                        header:
+                            SectionHeader(title: "Quick Add Transactions") {
+                                showingAddQuickAddTransaction = true
+                            }
+                            .accessibilityIdentifier("AddQuickAdd_SectionHeader")
                     ) {
                         if quickAddTransactions.isEmpty {
-                            EmptyStateView(message: "No quick add transactions. Add some to get started.", systemImage: "plus.circle")
-                                .listRowSeparator(.hidden)
-                                .listRowBackground(Color.clear)
+                            EmptyStateView(
+                                message: "No quick add transactions. Add some to get started.",
+                                systemImage: "plus.circle"
+                            )
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
                         } else {
                             let incomeQuickAddTransactions = quickAddTransactions.filter { $0.isIncome }
                             let expenseQuickAddTransactions = quickAddTransactions.filter { !$0.isIncome }
@@ -141,34 +153,45 @@ struct SettingsTabView: View {
                         }
                     }
                 }
+                .id(refreshID)
                 .listStyle(PlainListStyle())
                 .scrollContentBackground(.hidden)
                 .background(Color.clear)
             }
             .navigationBarTitle("Settings", displayMode: .inline)
             .navigationBarItems(trailing: EditButton())
+            // Add Predefined
             .sheet(isPresented: $showingAddPredefinedTransaction) {
                 NavigationView {
                     AddPredefinedTransactionView()
                         .environment(\.managedObjectContext, viewContext)
                 }
             }
+            // Edit Predefined
             .sheet(item: $predefinedTransactionToEdit) { transaction in
                 NavigationView {
                     EditPredefinedTransactionView(transaction: transaction)
                         .environment(\.managedObjectContext, viewContext)
                 }
+                .onDisappear {
+                    refreshID = UUID()
+                }
             }
+            // Add Quick Add
             .sheet(isPresented: $showingAddQuickAddTransaction) {
                 NavigationView {
                     AddQuickAddTransactionView()
                         .environment(\.managedObjectContext, viewContext)
                 }
             }
+            // Edit Quick Add
             .sheet(item: $quickAddTransactionToEdit) { transaction in
                 NavigationView {
                     EditQuickAddTransactionView(transaction: transaction)
                         .environment(\.managedObjectContext, viewContext)
+                }
+                .onDisappear {
+                    refreshID = UUID()
                 }
             }
         }
@@ -301,7 +324,7 @@ struct SettingsTabView: View {
         private func formattedAmount(transaction: QuickAddTransaction) -> String {
             let amount = abs(transaction.amount)
             let prefix = transaction.isIncome ? "$" : "-$"
-            return "\(prefix)\(String(format: "%.2f", amount))"
+            return "\(prefix)\(String(format: "%.2F", amount))"
         }
     }
 
