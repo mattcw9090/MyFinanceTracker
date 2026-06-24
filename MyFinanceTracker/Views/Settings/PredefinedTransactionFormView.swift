@@ -29,6 +29,7 @@ struct PredefinedTransactionFormView: View {
     @State private var descriptionText: String
     @State private var amount: String
     @State private var selectedDay: String
+    @State private var repeatsEveryDay: Bool
     @State private var isIncome: Bool
     @State private var showAlert = false
     @State private var alertMessage = ""
@@ -40,11 +41,13 @@ struct PredefinedTransactionFormView: View {
             _descriptionText = State(initialValue: "")
             _amount = State(initialValue: "")
             _selectedDay = State(initialValue: "Monday")
+            _repeatsEveryDay = State(initialValue: false)
             _isIncome = State(initialValue: true)
         case .edit(let tx):
             _descriptionText = State(initialValue: tx.desc ?? "")
             _amount = State(initialValue: String(tx.amount))
-            _selectedDay = State(initialValue: tx.dayOfWeek ?? "Monday")
+            _selectedDay = State(initialValue: tx.repeatsEveryDay ? "Monday" : (tx.dayOfWeek ?? "Monday"))
+            _repeatsEveryDay = State(initialValue: tx.repeatsEveryDay)
             _isIncome = State(initialValue: tx.isIncome)
         }
     }
@@ -61,15 +64,35 @@ struct PredefinedTransactionFormView: View {
                             .decimalInput($amount)
                             .accessibilityIdentifier("\(mode.identifierPrefix)_AmountTextField")
                     }
-                    Section(header: Text("Day of the Week").font(.headline)) {
-                        Picker("Select Day", selection: $selectedDay) {
-                            ForEach(Weekday.allNames, id: \.self) { day in
-                                Text(day)
-                                    .accessibilityIdentifier("\(mode.identifierPrefix)_DayPicker_\(day)")
+                    Section {
+                        Toggle(isOn: $repeatsEveryDay.animation(.snappy)) {
+                            Label {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Every day")
+                                    Text("Add this transaction to all seven days")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            } icon: {
+                                Image(systemName: "repeat.circle.fill")
+                                    .foregroundStyle(FinanceTheme.accent)
                             }
                         }
-                        .pickerStyle(WheelPickerStyle())
-                        .accessibilityIdentifier("\(mode.identifierPrefix)_DayPicker")
+                        .tint(FinanceTheme.accent)
+                        .accessibilityIdentifier("\(mode.identifierPrefix)_EveryDayToggle")
+
+                        if !repeatsEveryDay {
+                            Picker("Day", selection: $selectedDay) {
+                                ForEach(Weekday.allNames, id: \.self) { day in
+                                    Text(day)
+                                        .accessibilityIdentifier("\(mode.identifierPrefix)_DayPicker_\(day)")
+                                }
+                            }
+                            .pickerStyle(.wheel)
+                            .accessibilityIdentifier("\(mode.identifierPrefix)_DayPicker")
+                        }
+                    } header: {
+                        Text("Schedule").font(.headline)
                     }
                     Section(header: Text("Transaction Type").font(.headline)) {
                         Picker("Type", selection: $isIncome) {
@@ -120,7 +143,7 @@ struct PredefinedTransactionFormView: View {
 
         target.desc = descriptionText
         target.amount = Double(amount) ?? 0.0
-        target.dayOfWeek = selectedDay
+        target.dayOfWeek = repeatsEveryDay ? PredefinedTransaction.everyDaySchedule : selectedDay
         target.isIncome = isIncome
 
         do {

@@ -101,6 +101,29 @@ struct SettingsTabView: View {
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
             } else {
+                let dailyItems = predefinedTransactions.filter { $0.repeatsEveryDay }
+                if !dailyItems.isEmpty {
+                    SectionSubHeader(text: "Every day", tint: FinanceTheme.accent)
+
+                    ForEach(dailyItems, id: \.id) { transaction in
+                        PredefinedTransactionRow(transaction: transaction)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                predefinedTransactionToEdit = transaction
+                            }
+                            .contextMenu {
+                                Button {
+                                    predefinedTransactionToEdit = transaction
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                            }
+                    }
+                    .onDelete { offsets in
+                        deletePredefinedTransaction(offsets, from: dailyItems)
+                    }
+                }
+
                 ForEach(daysOfWeek, id: \.self) { day in
                     let items = predefinedTransactions.filter { $0.dayOfWeek == day }
                     if !items.isEmpty {
@@ -238,7 +261,8 @@ private struct PredefinedTransactionRow: View {
         SettingsTransactionRow(
             desc: transaction.desc ?? "No Description",
             amount: transaction.amount,
-            isIncome: transaction.isIncome
+            isIncome: transaction.isIncome,
+            schedule: transaction.repeatsEveryDay ? "Every day" : nil
         )
     }
 }
@@ -261,6 +285,7 @@ private struct SettingsTransactionRow: View {
     let desc: String
     let amount: Double
     let isIncome: Bool
+    var schedule: String? = nil
 
     var body: some View {
         HStack(spacing: 14) {
@@ -272,7 +297,7 @@ private struct SettingsTransactionRow: View {
                 Text(desc)
                     .font(.body)
                     .foregroundColor(.primary)
-                Text(isIncome ? "Income" : "Expense")
+                Text([isIncome ? "Income" : "Expense", schedule].compactMap { $0 }.joined(separator: " • "))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

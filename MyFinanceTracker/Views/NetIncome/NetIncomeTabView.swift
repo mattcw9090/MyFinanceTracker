@@ -194,20 +194,26 @@ struct NetIncomeTabView: View {
                 activeAlert = .noPredefinedTransactions
             } else {
                 for predefinedTransaction in predefinedTransactions {
-                    let newTransaction = Transaction(
-                        desc: predefinedTransaction.desc,
-                        amount: predefinedTransaction.amount,
-                        dayOfWeek: predefinedTransaction.dayOfWeek,
-                        isCompleted: false,
-                        isIncome: predefinedTransaction.isIncome
-                    )
-                    modelContext.insert(newTransaction)
+                    let scheduledDays = predefinedTransaction.repeatsEveryDay
+                        ? Weekday.allNames
+                        : [predefinedTransaction.dayOfWeek ?? Weekday.today]
 
-                    netIncomeManager.adjustNetIncome(
-                        by: predefinedTransaction.amount,
-                        isIncome: predefinedTransaction.isIncome,
-                        isDeletion: false
-                    )
+                    for day in scheduledDays {
+                        let newTransaction = Transaction(
+                            desc: predefinedTransaction.desc,
+                            amount: predefinedTransaction.amount,
+                            dayOfWeek: day,
+                            isCompleted: false,
+                            isIncome: predefinedTransaction.isIncome
+                        )
+                        modelContext.insert(newTransaction)
+
+                        netIncomeManager.adjustNetIncome(
+                            by: predefinedTransaction.amount,
+                            isIncome: predefinedTransaction.isIncome,
+                            isDeletion: false
+                        )
+                    }
                 }
 
                 try modelContext.save()

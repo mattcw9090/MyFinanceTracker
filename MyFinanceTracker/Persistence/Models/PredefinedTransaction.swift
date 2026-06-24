@@ -23,3 +23,11 @@ final class PredefinedTransaction {
         self.isIncome = isIncome
     }
 }
+
+extension PredefinedTransaction {
+    static let everyDaySchedule = "Every day"
+
+    var repeatsEveryDay: Bool {
+        dayOfWeek == Self.everyDaySchedule
+    }
+}
