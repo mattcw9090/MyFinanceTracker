@@ -46,8 +46,8 @@
             filePath = "MyFinanceTrackerUITests/MyFinanceTrackerUITests.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "660"
-            endingLineNumber = "660"
+            startingLineNumber = "668"
+            endingLineNumber = "668"
             landmarkName = "testQuickAddTransactionReflectOnAddTransactionView()"
             landmarkType = "7">
          </BreakpointContent>
@@ -62,8 +62,8 @@
             filePath = "MyFinanceTrackerUITests/MyFinanceTrackerUITests.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "658"
-            endingLineNumber = "658"
+            startingLineNumber = "666"
+            endingLineNumber = "666"
             landmarkName = "testQuickAddTransactionReflectOnAddTransactionView()"
             landmarkType = "7">
          </BreakpointContent>
@@ -79,9 +79,7 @@
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "337"
-            endingLineNumber = "337"
-            landmarkName = "deletePredefinedTransaction(_:from:)"
-            landmarkType = "7">
+            endingLineNumber = "337">
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>

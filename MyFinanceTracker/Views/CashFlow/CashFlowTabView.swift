@@ -11,6 +11,7 @@ struct CashFlowTabView: View {
 
     @State private var showingAddOwedToMe = false
     @State private var showingAddIOwe = false
+    @State private var showingBulkAdd = false
     @State private var cashFlowItemToEdit: CashFlowItem?
 
     var body: some View {
@@ -62,6 +63,14 @@ struct CashFlowTabView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
             }
+            .sheet(isPresented: $showingBulkAdd) {
+                NavigationView {
+                    BulkAddCashFlowItemsView()
+                        .environment(\.managedObjectContext, viewContext)
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
             .sheet(item: $cashFlowItemToEdit) { item in
                 NavigationView {
                     EditCashFlowItemView(item: item)
@@ -80,6 +89,10 @@ struct CashFlowTabView: View {
             }
             Button(action: { showingAddIOwe = true }) {
                 Label("Add I Owe", systemImage: "arrow.up.circle.fill")
+            }
+            Divider()
+            Button(action: { showingBulkAdd = true }) {
+                Label("Bulk Add (Split Bill)", systemImage: "person.3.fill")
             }
         } label: {
             Image(systemName: "plus.circle.fill")

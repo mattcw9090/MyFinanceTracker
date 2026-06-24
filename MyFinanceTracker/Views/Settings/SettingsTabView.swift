@@ -37,129 +37,40 @@ struct SettingsTabView: View {
                 .ignoresSafeArea()
 
                 List {
-                    // MARK: Predefined Transactions Section
-                    Section(
-                        header:
-                            SectionHeader(title: "Predefined Transactions") {
-                                showingAddPredefinedTransaction = true
-                            }
-                            .accessibilityIdentifier("AddPredefined_SectionHeader")
-                    ) {
-                        if predefinedTransactions.isEmpty {
-                            EmptyStateView(
-                                message: "No predefined transactions. Add some to get started.",
-                                imageName: "tray"
-                            )
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                        } else {
-                            ForEach(daysOfWeek, id: \.self) { day in
-                                let transactionsForDay = predefinedTransactions.filter { $0.dayOfWeek == day }
-                                if !transactionsForDay.isEmpty {
-                                    Text(day)
-                                        .font(.system(size: 15))
-                                        .fontWeight(.bold)
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 8)
-                                        .listRowSeparator(.visible)
-                                        .listRowInsets(EdgeInsets())
-                                        .listRowBackground(Color.clear)
-
-                                    ForEach(transactionsForDay, id: \.id) { transaction in
-                                        PredefinedTransactionRow(transaction: transaction)
-                                            .onTapGesture {
-                                                predefinedTransactionToEdit = transaction
-                                            }
-                                            .listRowInsets(EdgeInsets())
-                                            .listRowSeparator(.visible)
-                                            .listRowBackground(Color.clear)
-                                    }
-                                    .onDelete { offsets in
-                                        deletePredefinedTransaction(offsets, from: transactionsForDay)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // MARK: Quick Add Transactions Section
-                    Section(
-                        header:
-                            SectionHeader(title: "Quick Add Transactions") {
-                                showingAddQuickAddTransaction = true
-                            }
-                            .accessibilityIdentifier("AddQuickAdd_SectionHeader")
-                    ) {
-                        if quickAddTransactions.isEmpty {
-                            EmptyStateView(
-                                message: "No quick add transactions. Add some to get started.",
-                                imageName: "plus.circle"
-                            )
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                        } else {
-                            let incomeQuickAddTransactions = quickAddTransactions.filter { $0.isIncome }
-                            let expenseQuickAddTransactions = quickAddTransactions.filter { !$0.isIncome }
-
-                            if !incomeQuickAddTransactions.isEmpty {
-                                Text("Income")
-                                    .font(.system(size: 15))
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.green)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .listRowSeparator(.visible)
-                                    .listRowInsets(EdgeInsets())
-                                    .listRowBackground(Color.clear)
-
-                                ForEach(incomeQuickAddTransactions, id: \.id) { transaction in
-                                    QuickAddTransactionRow(transaction: transaction)
-                                        .onTapGesture {
-                                            quickAddTransactionToEdit = transaction
-                                        }
-                                        .listRowInsets(EdgeInsets())
-                                        .listRowSeparator(.visible)
-                                        .listRowBackground(Color.clear)
-                                }
-                                .onDelete { offsets in
-                                    deleteQuickAddTransaction(offsets: offsets, from: incomeQuickAddTransactions)
-                                }
-                            }
-
-                            if !expenseQuickAddTransactions.isEmpty {
-                                Text("Expense")
-                                    .font(.system(size: 15))
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.red)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .listRowSeparator(.visible)
-                                    .listRowInsets(EdgeInsets())
-                                    .listRowBackground(Color.clear)
-
-                                ForEach(expenseQuickAddTransactions, id: \.id) { transaction in
-                                    QuickAddTransactionRow(transaction: transaction)
-                                        .onTapGesture {
-                                            quickAddTransactionToEdit = transaction
-                                        }
-                                        .listRowInsets(EdgeInsets())
-                                        .listRowSeparator(.visible)
-                                        .listRowBackground(Color.clear)
-                                }
-                                .onDelete { offsets in
-                                    deleteQuickAddTransaction(offsets: offsets, from: expenseQuickAddTransactions)
-                                }
-                            }
-                        }
-                    }
+                    predefinedGroup
+                    quickAddGroup
                 }
                 .id(refreshID)
-                .listStyle(PlainListStyle())
+                .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
-                .background(Color.clear)
             }
             .navigationBarTitle("Settings", displayMode: .inline)
-            .navigationBarItems(trailing: EditButton())
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    EditButton()
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button {
+                            showingAddPredefinedTransaction = true
+                        } label: {
+                            Label("Add Predefined Transaction", systemImage: "calendar.badge.plus")
+                        }
+                        .accessibilityIdentifier("AddPredefined_SectionHeader")
+
+                        Button {
+                            showingAddQuickAddTransaction = true
+                        } label: {
+                            Label("Add Quick Add Transaction", systemImage: "bolt.fill")
+                        }
+                        .accessibilityIdentifier("AddQuickAdd_SectionHeader")
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .imageScale(.large)
+                    }
+                    .accessibilityIdentifier("Settings_AddMenu")
+                }
+            }
             // Add Predefined
             .sheet(isPresented: $showingAddPredefinedTransaction) {
                 NavigationView {
@@ -197,120 +108,106 @@ struct SettingsTabView: View {
         }
     }
 
-    // MARK: - Section Header View
-    struct SectionHeader: View {
-        let title: String
-        let action: () -> Void
+    // MARK: - Predefined Group
 
-        var body: some View {
-            HStack {
-                Text(title)
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                Spacer()
-                Button(action: action) {
-                    Image(systemName: "plus.circle.fill")
-                        .imageScale(.large)
-                        .foregroundStyle(.tint)
-                }
-                .buttonStyle(BorderlessButtonStyle())
-                .accessibilityLabel("Add \(title)")
-            }
-            .padding(.vertical, 4)
-        }
-    }
+    @ViewBuilder
+    private var predefinedGroup: some View {
+        Section {
+            if predefinedTransactions.isEmpty {
+                EmptyStateView(
+                    message: "No predefined transactions. Add some to get started.",
+                    imageName: "tray"
+                )
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+            } else {
+                ForEach(daysOfWeek, id: \.self) { day in
+                    let items = predefinedTransactions.filter { $0.dayOfWeek == day }
+                    if !items.isEmpty {
+                        SectionSubHeader(text: day)
 
-    // MARK: - Predefined Transaction Row
-    struct PredefinedTransactionRow: View {
-        let transaction: PredefinedTransaction
-
-        var body: some View {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(UIColor.secondarySystemBackground))
-                    .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
-
-                HStack(spacing: 16) {
-                    Image(systemName: transaction.isIncome ? "arrow.up.circle" : "arrow.down.circle")
-                        .foregroundColor(transaction.isIncome ? .green : .red)
-                        .imageScale(.medium)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(transaction.desc ?? "No Description")
-                            .font(.body)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.primary)
-                        Text(transaction.isIncome ? "Income" : "Expense")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        ForEach(items, id: \.id) { transaction in
+                            SettingsTransactionRow(
+                                desc: transaction.desc ?? "No Description",
+                                amount: transaction.amount,
+                                isIncome: transaction.isIncome
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                predefinedTransactionToEdit = transaction
+                            }
+                        }
+                        .onDelete { offsets in
+                            deletePredefinedTransaction(offsets, from: items)
+                        }
                     }
-
-                    Spacer()
-
-                    Text(formattedAmount(transaction: transaction))
-                        .foregroundColor(transaction.isIncome ? .green : .red)
-                        .fontWeight(.bold)
-                        .font(.body)
                 }
-                .padding()
             }
-            .padding(.vertical, 4)
-            .padding(.horizontal, 8)
-        }
-
-        private func formattedAmount(transaction: PredefinedTransaction) -> String {
-            let amount = abs(transaction.amount)
-            let prefix = transaction.isIncome ? "$" : "-$"
-            return "\(prefix)\(String(format: "%.2f", amount))"
+        } header: {
+            Text("Predefined Transactions")
         }
     }
 
-    // MARK: - Quick Add Transaction Row
-    struct QuickAddTransactionRow: View {
-        let transaction: QuickAddTransaction
+    // MARK: - Quick Add Group
 
-        var body: some View {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(UIColor.secondarySystemBackground))
-                    .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+    @ViewBuilder
+    private var quickAddGroup: some View {
+        Section {
+            if quickAddTransactions.isEmpty {
+                EmptyStateView(
+                    message: "No quick add transactions. Add some to get started.",
+                    imageName: "plus.circle"
+                )
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+            } else {
+                let income = quickAddTransactions.filter { $0.isIncome }
+                let expense = quickAddTransactions.filter { !$0.isIncome }
 
-                HStack(spacing: 16) {
-                    Image(systemName: transaction.isIncome ? "arrow.up.circle" : "arrow.down.circle")
-                        .foregroundColor(transaction.isIncome ? .green : .red)
-                        .imageScale(.medium)
+                if !income.isEmpty {
+                    SectionSubHeader(text: "Income", tint: .green)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(transaction.desc ?? "No Description")
-                            .font(.body)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.primary)
-                        Text(transaction.isIncome ? "Income" : "Expense")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    ForEach(income, id: \.id) { transaction in
+                        SettingsTransactionRow(
+                            desc: transaction.desc ?? "No Description",
+                            amount: transaction.amount,
+                            isIncome: transaction.isIncome
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            quickAddTransactionToEdit = transaction
+                        }
                     }
-
-                    Spacer()
-
-                    Text(formattedAmount(transaction: transaction))
-                        .foregroundColor(transaction.isIncome ? .green : .red)
-                        .fontWeight(.bold)
-                        .font(.body)
+                    .onDelete { offsets in
+                        deleteQuickAddTransaction(offsets: offsets, from: income)
+                    }
                 }
-                .padding()
-            }
-            .padding(.vertical, 4)
-            .padding(.horizontal, 8)
-        }
 
-        private func formattedAmount(transaction: QuickAddTransaction) -> String {
-            let amount = abs(transaction.amount)
-            let prefix = transaction.isIncome ? "$" : "-$"
-            return "\(prefix)\(String(format: "%.2f", amount))"
+                if !expense.isEmpty {
+                    SectionSubHeader(text: "Expense", tint: .red)
+
+                    ForEach(expense, id: \.id) { transaction in
+                        SettingsTransactionRow(
+                            desc: transaction.desc ?? "No Description",
+                            amount: transaction.amount,
+                            isIncome: transaction.isIncome
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            quickAddTransactionToEdit = transaction
+                        }
+                    }
+                    .onDelete { offsets in
+                        deleteQuickAddTransaction(offsets: offsets, from: expense)
+                    }
+                }
+            }
+        } header: {
+            Text("Quick Add Transactions")
         }
     }
 
-    // MARK: - Helper Functions
+    // MARK: - Helpers
 
     private func deletePredefinedTransaction(_ offsets: IndexSet, from transactionsForDay: [PredefinedTransaction]) {
         withAnimation {
@@ -332,5 +229,61 @@ struct SettingsTabView: View {
         } catch {
             print("Error saving context: \(error.localizedDescription)")
         }
+    }
+}
+
+// MARK: - Sub-header row inside a Section
+
+private struct SectionSubHeader: View {
+    let text: String
+    var tint: Color = .secondary
+
+    var body: some View {
+        Text(text.uppercased())
+            .font(.caption.weight(.semibold))
+            .foregroundColor(tint)
+            .padding(.top, 6)
+            .padding(.bottom, 2)
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+    }
+}
+
+// MARK: - Shared row layout for predefined + quick-add
+
+private struct SettingsTransactionRow: View {
+    let desc: String
+    let amount: Double
+    let isIncome: Bool
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: isIncome ? "arrow.up.circle.fill" : "arrow.down.circle.fill")
+                .foregroundColor(isIncome ? .green : .red)
+                .imageScale(.large)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(desc)
+                    .font(.body)
+                    .foregroundColor(.primary)
+                Text(isIncome ? "Income" : "Expense")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            Text(formattedAmount)
+                .font(.body.weight(.semibold))
+                .foregroundColor(isIncome ? .green : .red)
+                .monospacedDigit()
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var formattedAmount: String {
+        let absAmount = abs(amount)
+        let prefix = isIncome ? "$" : "-$"
+        return "\(prefix)\(String(format: "%.2f", absAmount))"
     }
 }

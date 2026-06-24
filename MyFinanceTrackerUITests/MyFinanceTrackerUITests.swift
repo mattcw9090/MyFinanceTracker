@@ -368,9 +368,13 @@ final class MyFinanceTrackerUITests: XCTestCase {
     private func addPredefinedTransaction(description: String, amount: String, day: String, isIncome: Bool) {
         let type = isIncome ? "Income" : "Expense"
         tapTab(named: "Settings")
-        
+
+        let menuButton = app.buttons["Settings_AddMenu"]
+        XCTAssertTrue(menuButton.exists, "Settings Add menu should exist")
+        menuButton.tap()
+
         let addButton = app.buttons["AddPredefined_SectionHeader"]
-        XCTAssertTrue(addButton.exists, "Add Predefined Transactions button should exist")
+        XCTAssertTrue(addButton.waitForExistence(timeout: 2), "Add Predefined Transactions menu item should exist")
         addButton.tap()
         
         XCTAssertTrue(app.staticTexts["Add Predefined Transaction"].waitForExistence(timeout: 5), "The 'Add Predefined Transaction' view should be presented")
@@ -425,9 +429,13 @@ final class MyFinanceTrackerUITests: XCTestCase {
     
     private func addQuickAddTransaction(description: String, amount: String, isIncome: Bool) {
         tapTab(named: "Settings")
-        
+
+        let menuButton = app.buttons["Settings_AddMenu"]
+        XCTAssertTrue(menuButton.exists, "Settings Add menu should exist")
+        menuButton.tap()
+
         let addButton = app.buttons["AddQuickAdd_SectionHeader"]
-        XCTAssertTrue(addButton.exists, "Add Quick Add Transactions button should exist")
+        XCTAssertTrue(addButton.waitForExistence(timeout: 2), "Add Quick Add Transactions menu item should exist")
         addButton.tap()
         
         enterText(in: app.textFields["AddQuickAdd_DescriptionTextField"], text: description)
