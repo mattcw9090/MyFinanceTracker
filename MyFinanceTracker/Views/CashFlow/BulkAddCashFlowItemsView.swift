@@ -65,10 +65,12 @@ struct BulkAddCashFlowItemsView: View {
                 .padding(.bottom, 50)
             }
         }
-        .navigationBarItems(
-            leading: Button("Cancel") { dismiss() }
-                .accessibilityIdentifier("BulkAdd_CancelButton")
-        )
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Cancel") { dismiss() }
+                    .accessibilityIdentifier("BulkAdd_CancelButton")
+            }
+        }
         .alert(isPresented: $showAlert) {
             Alert(
                 title: Text("Error"),

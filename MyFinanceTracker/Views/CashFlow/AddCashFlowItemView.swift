@@ -55,9 +55,11 @@ struct AddCashFlowItemView: View {
                 .padding(.bottom, 50)
             }
         }
-        .navigationBarItems(
-            leading: Button("Cancel") { dismiss() }
-        )
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Cancel") { dismiss() }
+            }
+        }
         .alert(isPresented: $showAlert) {
             Alert(
                 title: Text("Error"),

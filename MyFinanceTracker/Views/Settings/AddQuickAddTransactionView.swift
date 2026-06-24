@@ -12,7 +12,7 @@ struct AddQuickAddTransactionView: View {
     @State private var alertMessage = ""
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 LinearGradient(
                     gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
@@ -43,21 +43,25 @@ struct AddQuickAddTransactionView: View {
                 .scrollContentBackground(.hidden)
                 .background(Color.clear)
             }
-            .navigationBarTitle("Add Quick Add Transaction", displayMode: .inline)
-            .navigationBarItems(
-                leading: Button("Cancel") { dismiss() }
-                    .accessibilityIdentifier("AddQuickAdd_CancelButton"),
-                trailing: Button("Save") { addQuickAddTransaction() }
-                    .accessibilityIdentifier("AddQuickAdd_SaveButton")
-                    .disabled(!isFormValid())
-            )
+            .navigationTitle("Add Quick Add Transaction")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .accessibilityIdentifier("AddQuickAdd_CancelButton")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") { addQuickAddTransaction() }
+                        .accessibilityIdentifier("AddQuickAdd_SaveButton")
+                        .disabled(!isFormValid())
+                }
+            }
             .alert(isPresented: $showAlert) {
                 Alert(title: Text("Error"),
                       message: Text(alertMessage),
                       dismissButton: .default(Text("OK")))
             }
         }
-        .navigationViewStyle(StackNavigationViewStyle())
     }
 
     private func isFormValid() -> Bool {

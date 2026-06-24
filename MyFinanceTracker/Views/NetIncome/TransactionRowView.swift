@@ -68,17 +68,16 @@ struct TransactionRowView: View {
             )
         }
         .sheet(isPresented: $showAdditionalCostInput) {
-            NavigationView {
+            NavigationStack {
                 Form {
                     Section(header: Text("Additional Court Cost")) {
                         TextField("Enter amount", text: $additionalCostString)
-                            .keyboardType(.decimalPad)
+                            .decimalInput($additionalCostString)
                     }
                     Section(header: Text("Split")) {
-                        // Only an Add button; entries with blank names are ignored
-                        Button(action: {
+                        Button {
                             splitNames.append("")
-                        }) {
+                        } label: {
                             Label("Add Person", systemImage: "plus.circle")
                         }
                         ForEach(splitNames.indices, id: \.self) { index in
@@ -86,18 +85,23 @@ struct TransactionRowView: View {
                         }
                     }
                 }
-                .navigationBarTitle("Add Court Cost", displayMode: .inline)
-                .navigationBarItems(
-                    leading: Button("Cancel") {
-                        showAdditionalCostInput = false
-                        toggleIsCompleted()
-                    },
-                    trailing: Button("Add") {
-                        addToCashFlow()
-                        toggleIsCompleted()
-                        showAdditionalCostInput = false
+                .navigationTitle("Add Court Cost")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Cancel") {
+                            showAdditionalCostInput = false
+                            toggleIsCompleted()
+                        }
                     }
-                )
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Add") {
+                            addToCashFlow()
+                            toggleIsCompleted()
+                            showAdditionalCostInput = false
+                        }
+                    }
+                }
             }
         }
     }

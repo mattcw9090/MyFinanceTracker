@@ -28,7 +28,7 @@ struct EditTransactionView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section(header: Text("Description").font(.headline)) {
                     TextField("Enter description", text: $descriptionText)
@@ -64,23 +64,25 @@ struct EditTransactionView: View {
                     .accessibilityIdentifier("editTransactionTypePicker")
                 }
             }
-            .navigationBarTitle("Edit Transaction", displayMode: .inline)
-            .navigationBarItems(
-                leading: Button("Cancel") { dismiss() }
-                    .accessibilityIdentifier("editCancelButton"),
-                trailing: Button("Save") {
-                    editTransaction()
+            .navigationTitle("Edit Transaction")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .accessibilityIdentifier("editCancelButton")
                 }
-                .disabled(!isFormValid())
-                .accessibilityIdentifier("saveButton")
-            )
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") { editTransaction() }
+                        .disabled(!isFormValid())
+                        .accessibilityIdentifier("saveButton")
+                }
+            }
             .alert(isPresented: $showAlert) {
                 Alert(title: Text("Error"),
                       message: Text(alertMessage),
                       dismissButton: .default(Text("OK")))
             }
         }
-        .navigationViewStyle(StackNavigationViewStyle())
     }
 
     private func isFormValid() -> Bool {

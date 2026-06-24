@@ -15,7 +15,7 @@ struct AddPredefinedTransactionView: View {
     @State private var alertMessage = ""
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 LinearGradient(
                     gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
@@ -55,21 +55,25 @@ struct AddPredefinedTransactionView: View {
                 .scrollContentBackground(.hidden)
                 .background(Color.clear)
             }
-            .navigationBarTitle("Add Predefined Transaction", displayMode: .inline)
-            .navigationBarItems(
-                leading: Button("Cancel") { dismiss() }
-                    .accessibilityIdentifier("AddPredefined_CancelButton"),
-                trailing: Button("Save") { addPredefinedTransaction() }
-                    .accessibilityIdentifier("AddPredefined_SaveButton")
-                    .disabled(!isFormValid())
-            )
+            .navigationTitle("Add Predefined Transaction")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .accessibilityIdentifier("AddPredefined_CancelButton")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") { addPredefinedTransaction() }
+                        .accessibilityIdentifier("AddPredefined_SaveButton")
+                        .disabled(!isFormValid())
+                }
+            }
             .alert(isPresented: $showAlert) {
                 Alert(title: Text("Error"),
                       message: Text(alertMessage),
                       dismissButton: .default(Text("OK")))
             }
         }
-        .navigationViewStyle(StackNavigationViewStyle())
     }
 
     private func isFormValid() -> Bool {

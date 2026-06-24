@@ -34,7 +34,7 @@ struct AddTransactionView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 LinearGradient(
                     gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
@@ -156,31 +156,32 @@ struct AddTransactionView: View {
                     }
                     .padding(.vertical)
                 }
-                .navigationBarTitle(isIncome ? "Add Income" : "Add Expense", displayMode: .inline)
-                .navigationBarItems(
-                    leading: Button(action: {
-                        dismiss()
-                    }) {
-                        Text("Cancel")
+                .navigationTitle(isIncome ? "Add Income" : "Add Expense")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Cancel") { dismiss() }
                             .fontWeight(.semibold)
+                            .accessibilityIdentifier("cancelButton")
                     }
-                    .accessibilityIdentifier("cancelButton"),
-                    trailing: Button(action: {
-                        addTransaction()
-                    }) {
-                        Text("Save")
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(isFormValid() ? Color.accentColor : Color.gray.opacity(0.5))
-                            )
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            addTransaction()
+                        } label: {
+                            Text("Save")
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(isFormValid() ? Color.accentColor : Color.gray.opacity(0.5))
+                                )
+                        }
+                        .disabled(!isFormValid())
+                        .accessibilityIdentifier("saveButton")
                     }
-                    .disabled(!isFormValid())
-                    .accessibilityIdentifier("saveButton")
-                )
+                }
                 .alert(isPresented: $showAlert) {
                     Alert(title: Text("Error"),
                           message: Text(alertMessage),
@@ -188,7 +189,6 @@ struct AddTransactionView: View {
                 }
             }
         }
-        .navigationViewStyle(StackNavigationViewStyle())
     }
 
     private func isFormValid() -> Bool {
@@ -199,35 +199,31 @@ struct AddTransactionView: View {
     }
 
     private func addTransaction() {
+        createTransaction(
+            amount: Double(amount) ?? 0.0,
+            desc: descriptionText,
+            isIncome: isIncome
+        )
+    }
+
+    private func applyQuickAddTransaction(_ template: QuickAddTransaction) {
+        createTransaction(
+            amount: template.amount,
+            desc: template.desc ?? "",
+            isIncome: template.isIncome
+        )
+    }
+
+    private func createTransaction(amount: Double, desc: String, isIncome: Bool) {
         let newTransaction = Transaction(context: viewContext)
         newTransaction.id = UUID()
-        newTransaction.amount = Double(amount) ?? 0.0
-        newTransaction.desc = descriptionText
+        newTransaction.amount = amount
+        newTransaction.desc = desc
         newTransaction.dayOfWeek = selectedDay
         newTransaction.isCompleted = false
         newTransaction.isIncome = isIncome
 
-        netIncomeManager.adjustNetIncome(by: newTransaction.amount, isIncome: isIncome, isDeletion: false)
-
-        do {
-            try viewContext.save()
-            dismiss()
-        } catch {
-            alertMessage = "Failed to add transaction: \(error.localizedDescription)"
-            showAlert = true
-        }
-    }
-
-    private func applyQuickAddTransaction(_ transaction: QuickAddTransaction) {
-        let newTransaction = Transaction(context: viewContext)
-        newTransaction.id = UUID()
-        newTransaction.amount = transaction.amount
-        newTransaction.desc = transaction.desc
-        newTransaction.dayOfWeek = selectedDay
-        newTransaction.isCompleted = false
-        newTransaction.isIncome = transaction.isIncome
-
-        netIncomeManager.adjustNetIncome(by: transaction.amount, isIncome: transaction.isIncome, isDeletion: false)
+        netIncomeManager.adjustNetIncome(by: amount, isIncome: isIncome, isDeletion: false)
 
         do {
             try viewContext.save()

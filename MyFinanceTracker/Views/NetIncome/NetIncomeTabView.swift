@@ -26,7 +26,7 @@ struct NetIncomeTabView: View {
     private var transactions: FetchedResults<Transaction>
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 LinearGradient(
                     gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
@@ -105,24 +105,27 @@ struct NetIncomeTabView: View {
                     .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .automatic))
                 }
             }
-            .navigationBarTitle("My Finance", displayMode: .inline)
-            .navigationBarItems(
-                leading: HStack(spacing: 20) {
-                    Button(action: { activeAlert = .reset }) {
-                        Image(systemName: "arrow.counterclockwise")
-                            .imageScale(.large)
-                            .foregroundColor(.red)
-                    }
-                    .accessibilityIdentifier("resetButton")
+            .navigationTitle("My Finance")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    HStack(spacing: 20) {
+                        Button { activeAlert = .reset } label: {
+                            Image(systemName: "arrow.counterclockwise")
+                                .imageScale(.large)
+                                .foregroundColor(.red)
+                        }
+                        .accessibilityIdentifier("resetButton")
 
-                    Button(action: { activeAlert = .initializeWeek }) {
-                        Image(systemName: "calendar.badge.plus")
-                            .imageScale(.large)
-                            .foregroundColor(.blue)
+                        Button { activeAlert = .initializeWeek } label: {
+                            Image(systemName: "calendar.badge.plus")
+                                .imageScale(.large)
+                                .foregroundColor(.blue)
+                        }
+                        .accessibilityIdentifier("initializeWeekButton")
                     }
-                    .accessibilityIdentifier("initializeWeekButton")
                 }
-            )
+            }
             .alert(item: $activeAlert) { alertType in
                 switch alertType {
                 case .reset:

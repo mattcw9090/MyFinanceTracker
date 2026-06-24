@@ -21,7 +21,7 @@ struct EditQuickAddTransactionView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 LinearGradient(
                     gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
@@ -52,21 +52,25 @@ struct EditQuickAddTransactionView: View {
                 .scrollContentBackground(.hidden)
                 .background(Color.clear)
             }
-            .navigationBarTitle("Edit Quick Add Transaction", displayMode: .inline)
-            .navigationBarItems(
-                leading: Button("Cancel") { dismiss() }
-                    .accessibilityIdentifier("EditQuickAdd_CancelButton"),
-                trailing: Button("Save") { editQuickAddTransaction() }
-                    .accessibilityIdentifier("EditQuickAdd_SaveButton")
-                    .disabled(!isFormValid())
-            )
+            .navigationTitle("Edit Quick Add Transaction")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .accessibilityIdentifier("EditQuickAdd_CancelButton")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") { editQuickAddTransaction() }
+                        .accessibilityIdentifier("EditQuickAdd_SaveButton")
+                        .disabled(!isFormValid())
+                }
+            }
             .alert(isPresented: $showAlert) {
                 Alert(title: Text("Error"),
                       message: Text(alertMessage),
                       dismissButton: .default(Text("OK")))
             }
         }
-        .navigationViewStyle(StackNavigationViewStyle())
     }
 
     private func isFormValid() -> Bool {
