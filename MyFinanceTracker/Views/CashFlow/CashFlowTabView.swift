@@ -150,14 +150,14 @@ struct CashFlowTabView: View {
         switch sheet {
         case .addOwedToMe:
             NavigationStack {
-                AddCashFlowItemView(isDefaultOwedToMe: true)
+                CashFlowItemFormView(mode: .add(defaultOwedToMe: true))
                     .environment(\.managedObjectContext, viewContext)
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         case .addIOwe:
             NavigationStack {
-                AddCashFlowItemView(isDefaultOwedToMe: false)
+                CashFlowItemFormView(mode: .add(defaultOwedToMe: false))
                     .environment(\.managedObjectContext, viewContext)
             }
             .presentationDetents([.large])
@@ -171,7 +171,7 @@ struct CashFlowTabView: View {
             .presentationDragIndicator(.visible)
         case .edit(let item):
             NavigationStack {
-                EditCashFlowItemView(item: item)
+                CashFlowItemFormView(mode: .edit(item))
                     .environment(\.managedObjectContext, viewContext)
             }
             .presentationDetents([.large])

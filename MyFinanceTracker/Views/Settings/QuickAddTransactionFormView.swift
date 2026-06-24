@@ -1,23 +1,48 @@
 import SwiftUI
 
-struct EditQuickAddTransactionView: View {
-    @Environment(\.managedObjectContext) private var viewContext
-    @Environment(\.dismiss) var dismiss
+struct QuickAddTransactionFormView: View {
+    enum Mode {
+        case add
+        case edit(QuickAddTransaction)
 
-    @ObservedObject var transaction: QuickAddTransaction
+        var identifierPrefix: String {
+            switch self {
+            case .add: return "AddQuickAdd"
+            case .edit: return "EditQuickAdd"
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .add: return "Add Quick Add Transaction"
+            case .edit: return "Edit Quick Add Transaction"
+            }
+        }
+    }
+
+    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.dismiss) private var dismiss
+
+    let mode: Mode
 
     @State private var descriptionText: String
     @State private var amount: String
     @State private var isIncome: Bool
-
     @State private var showAlert = false
     @State private var alertMessage = ""
 
-    init(transaction: QuickAddTransaction) {
-        self.transaction = transaction
-        _descriptionText = State(initialValue: transaction.desc ?? "")
-        _amount = State(initialValue: String(transaction.amount))
-        _isIncome = State(initialValue: transaction.isIncome)
+    init(mode: Mode) {
+        self.mode = mode
+        switch mode {
+        case .add:
+            _descriptionText = State(initialValue: "")
+            _amount = State(initialValue: "")
+            _isIncome = State(initialValue: true)
+        case .edit(let tx):
+            _descriptionText = State(initialValue: tx.desc ?? "")
+            _amount = State(initialValue: String(tx.amount))
+            _isIncome = State(initialValue: tx.isIncome)
+        }
     }
 
     var body: some View {
@@ -33,12 +58,12 @@ struct EditQuickAddTransactionView: View {
                 Form {
                     Section(header: Text("Description").font(.headline)) {
                         TextField("Enter description", text: $descriptionText)
-                            .accessibilityIdentifier("EditQuickAdd_DescriptionTextField")
+                            .accessibilityIdentifier("\(mode.identifierPrefix)_DescriptionTextField")
                     }
                     Section(header: Text("Amount").font(.headline)) {
                         TextField("Enter amount", text: $amount)
                             .decimalInput($amount)
-                            .accessibilityIdentifier("EditQuickAdd_AmountTextField")
+                            .accessibilityIdentifier("\(mode.identifierPrefix)_AmountTextField")
                     }
                     Section(header: Text("Transaction Type").font(.headline)) {
                         Picker("Type", selection: $isIncome) {
@@ -46,23 +71,23 @@ struct EditQuickAddTransactionView: View {
                             Text("Expense").tag(false)
                         }
                         .pickerStyle(SegmentedPickerStyle())
-                        .accessibilityIdentifier("EditQuickAdd_TypePicker")
+                        .accessibilityIdentifier("\(mode.identifierPrefix)_TypePicker")
                     }
                 }
                 .scrollContentBackground(.hidden)
                 .background(Color.clear)
             }
-            .navigationTitle("Edit Quick Add Transaction")
+            .navigationTitle(mode.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
-                        .accessibilityIdentifier("EditQuickAdd_CancelButton")
+                        .accessibilityIdentifier("\(mode.identifierPrefix)_CancelButton")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") { editQuickAddTransaction() }
-                        .accessibilityIdentifier("EditQuickAdd_SaveButton")
-                        .disabled(!isFormValid())
+                    Button("Save") { commit() }
+                        .accessibilityIdentifier("\(mode.identifierPrefix)_SaveButton")
+                        .disabled(!isFormValid)
                 }
             }
             .alert(isPresented: $showAlert) {
@@ -73,23 +98,30 @@ struct EditQuickAddTransactionView: View {
         }
     }
 
-    private func isFormValid() -> Bool {
-        guard let amt = Double(amount), amt > 0, !descriptionText.isEmpty else {
-            return false
-        }
+    private var isFormValid: Bool {
+        guard let amt = Double(amount), amt > 0, !descriptionText.isEmpty else { return false }
         return true
     }
 
-    private func editQuickAddTransaction() {
-        transaction.desc = descriptionText
-        transaction.amount = Double(amount) ?? 0.0
-        transaction.isIncome = isIncome
+    private func commit() {
+        let target: QuickAddTransaction
+        switch mode {
+        case .add:
+            target = QuickAddTransaction(context: viewContext)
+            target.id = UUID()
+        case .edit(let tx):
+            target = tx
+        }
+
+        target.desc = descriptionText
+        target.amount = Double(amount) ?? 0.0
+        target.isIncome = isIncome
 
         do {
             try viewContext.save()
             dismiss()
         } catch {
-            alertMessage = "Failed to edit quick add transaction: \(error.localizedDescription)"
+            alertMessage = "Failed to save quick add transaction: \(error.localizedDescription)"
             showAlert = true
         }
     }

@@ -70,32 +70,24 @@ struct SettingsTabView: View {
                 }
             }
             .sheet(isPresented: $showingAddPredefinedTransaction) {
-                NavigationStack {
-                    AddPredefinedTransactionView()
-                        .environment(\.managedObjectContext, viewContext)
-                }
+                PredefinedTransactionFormView(mode: .add)
+                    .environment(\.managedObjectContext, viewContext)
             }
             .sheet(item: $predefinedTransactionToEdit) { transaction in
-                NavigationStack {
-                    EditPredefinedTransactionView(transaction: transaction)
-                        .environment(\.managedObjectContext, viewContext)
-                }
+                PredefinedTransactionFormView(mode: .edit(transaction))
+                    .environment(\.managedObjectContext, viewContext)
             }
             .sheet(item: $predefinedTransactionToDuplicate) { transaction in
                 DuplicatePredefinedTransactionView(source: transaction)
                     .environment(\.managedObjectContext, viewContext)
             }
             .sheet(isPresented: $showingAddQuickAddTransaction) {
-                NavigationStack {
-                    AddQuickAddTransactionView()
-                        .environment(\.managedObjectContext, viewContext)
-                }
+                QuickAddTransactionFormView(mode: .add)
+                    .environment(\.managedObjectContext, viewContext)
             }
             .sheet(item: $quickAddTransactionToEdit) { transaction in
-                NavigationStack {
-                    EditQuickAddTransactionView(transaction: transaction)
-                        .environment(\.managedObjectContext, viewContext)
-                }
+                QuickAddTransactionFormView(mode: .edit(transaction))
+                    .environment(\.managedObjectContext, viewContext)
             }
         }
     }

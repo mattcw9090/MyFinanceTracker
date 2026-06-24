@@ -1,21 +1,48 @@
 import SwiftUI
 
-struct EditCashFlowItemView: View {
-    @Environment(\.managedObjectContext) private var viewContext
-    @Environment(\.dismiss) var dismiss
+struct CashFlowItemFormView: View {
+    enum Mode {
+        case add(defaultOwedToMe: Bool)
+        case edit(CashFlowItem)
 
-    @ObservedObject var item: CashFlowItem
+        var title: String {
+            switch self {
+            case .add: return "Add Cash Flow Item"
+            case .edit: return "Edit Cash Flow Item"
+            }
+        }
+
+        var saveButtonTitle: String {
+            switch self {
+            case .add: return "Save"
+            case .edit: return "Save Changes"
+            }
+        }
+    }
+
+    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.dismiss) private var dismiss
+
+    let mode: Mode
+
     @State private var name: String
     @State private var amount: String
     @State private var isOwedToMe: Bool
     @State private var showAlert = false
     @State private var alertMessage = ""
 
-    init(item: CashFlowItem) {
-        self.item = item
-        _name = State(initialValue: item.name ?? "")
-        _amount = State(initialValue: String(item.amount))
-        _isOwedToMe = State(initialValue: item.isOwedToMe)
+    init(mode: Mode) {
+        self.mode = mode
+        switch mode {
+        case .add(let defaultOwedToMe):
+            _name = State(initialValue: "")
+            _amount = State(initialValue: "")
+            _isOwedToMe = State(initialValue: defaultOwedToMe)
+        case .edit(let item):
+            _name = State(initialValue: item.name ?? "")
+            _amount = State(initialValue: String(item.amount))
+            _isOwedToMe = State(initialValue: item.isOwedToMe)
+        }
     }
 
     private var isFormValid: Bool {
@@ -34,16 +61,17 @@ struct EditCashFlowItemView: View {
 
             ScrollView {
                 VStack(spacing: 30) {
-                    Text("Edit Cash Flow Item")
+                    Text(mode.title)
                         .font(.largeTitle)
-                        .bold()
+                        .fontWeight(.bold)
                         .padding(.top, 20)
                         .foregroundColor(.primary)
 
                     CashFlowFormFields(name: $name, amount: $amount, isOwedToMe: $isOwedToMe)
+                        .padding(.horizontal)
 
-                    Button(action: editCashFlowItem) {
-                        Text("Save Changes")
+                    Button(action: commit) {
+                        Text(mode.saveButtonTitle)
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -72,16 +100,25 @@ struct EditCashFlowItemView: View {
         }
     }
 
-    private func editCashFlowItem() {
-        item.name = name
-        item.amount = Double(amount) ?? 0.0
-        item.isOwedToMe = isOwedToMe
+    private func commit() {
+        let target: CashFlowItem
+        switch mode {
+        case .add:
+            target = CashFlowItem(context: viewContext)
+            target.id = UUID()
+        case .edit(let item):
+            target = item
+        }
+
+        target.name = name
+        target.amount = Double(amount) ?? 0.0
+        target.isOwedToMe = isOwedToMe
 
         do {
             try viewContext.save()
             dismiss()
         } catch {
-            alertMessage = "Failed to edit cash flow item: \(error.localizedDescription)"
+            alertMessage = "Failed to save cash flow item: \(error.localizedDescription)"
             showAlert = true
         }
     }
