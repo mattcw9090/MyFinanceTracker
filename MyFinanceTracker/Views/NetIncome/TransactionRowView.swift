@@ -24,9 +24,10 @@ struct TransactionRowView: View {
                     .accessibilityIdentifier("transactionType")
             }
             Spacer()
-            Text(formattedAmount())
+            Text(signedAmount.formattedAsCurrency())
                 .foregroundColor(transaction.isIncome ? .green : .red)
                 .font(.system(size: 16, weight: .bold))
+                .monospacedDigit()
                 .accessibilityIdentifier("transactionAmount")
 
             HStack(spacing: 12) {
@@ -101,11 +102,9 @@ struct TransactionRowView: View {
         }
     }
 
-    /// Formats the transaction amount for display.
-    private func formattedAmount() -> String {
-        let amount = abs(transaction.amount)
-        let formattedAmount = String(format: "%.2f", amount)
-        return "\(transaction.isIncome ? "$" : "-$")\(formattedAmount)"
+    private var signedAmount: Double {
+        let magnitude = abs(transaction.amount)
+        return transaction.isIncome ? magnitude : -magnitude
     }
 
     /// Handles the action when the "Mark as Complete" button is tapped.

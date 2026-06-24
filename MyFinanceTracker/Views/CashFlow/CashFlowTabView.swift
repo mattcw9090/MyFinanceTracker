@@ -9,13 +9,26 @@ struct CashFlowTabView: View {
     )
     private var cashFlowItems: FetchedResults<CashFlowItem>
 
-    @State private var showingAddOwedToMe = false
-    @State private var showingAddIOwe = false
-    @State private var showingBulkAdd = false
-    @State private var cashFlowItemToEdit: CashFlowItem?
+    @State private var presentedSheet: PresentedSheet?
+
+    enum PresentedSheet: Identifiable {
+        case addOwedToMe
+        case addIOwe
+        case bulkAdd
+        case edit(CashFlowItem)
+
+        var id: String {
+            switch self {
+            case .addOwedToMe: return "addOwedToMe"
+            case .addIOwe: return "addIOwe"
+            case .bulkAdd: return "bulkAdd"
+            case .edit(let item): return "edit-\(item.objectID.uriRepresentation().absoluteString)"
+            }
+        }
+    }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 LinearGradient(
                     gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
@@ -24,18 +37,23 @@ struct CashFlowTabView: View {
                 )
                 .ignoresSafeArea()
 
-                VStack {
+                VStack(spacing: 0) {
+                    summaryCard
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                        .padding(.bottom, 4)
+
                     List {
                         cashFlowSection(
                             title: "Who owes me money",
-                            items: cashFlowItems.filter { $0.isOwedToMe },
+                            items: owedToMeItems,
                             emptyMessage: "No one owes you money.",
                             emptyImage: "person.fill.questionmark"
                         )
 
                         cashFlowSection(
                             title: "Who I owe money",
-                            items: cashFlowItems.filter { !$0.isOwedToMe },
+                            items: iOweItems,
                             emptyMessage: "You don't owe money to anyone.",
                             emptyImage: "person.fill.checkmark"
                         )
@@ -45,53 +63,79 @@ struct CashFlowTabView: View {
                     .accessibilityIdentifier("cashFlowListView")
                 }
             }
-            .navigationBarTitle("Cash Flow", displayMode: .inline)
-            .navigationBarItems(trailing: addButton)
-            .sheet(isPresented: $showingAddOwedToMe) {
-                NavigationView {
-                    AddCashFlowItemView(isDefaultOwedToMe: true)
-                        .environment(\.managedObjectContext, viewContext)
+            .navigationTitle("Cash Flow")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    addMenu
                 }
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
             }
-            .sheet(isPresented: $showingAddIOwe) {
-                NavigationView {
-                    AddCashFlowItemView(isDefaultOwedToMe: false)
-                        .environment(\.managedObjectContext, viewContext)
-                }
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-            }
-            .sheet(isPresented: $showingBulkAdd) {
-                NavigationView {
-                    BulkAddCashFlowItemsView()
-                        .environment(\.managedObjectContext, viewContext)
-                }
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-            }
-            .sheet(item: $cashFlowItemToEdit) { item in
-                NavigationView {
-                    EditCashFlowItemView(item: item)
-                        .environment(\.managedObjectContext, viewContext)
-                }
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-            }
+            .sheet(item: $presentedSheet, content: sheetContent)
         }
     }
 
-    private var addButton: some View {
+    // MARK: - Derived state
+
+    private var owedToMeItems: [CashFlowItem] {
+        cashFlowItems.filter { $0.isOwedToMe }
+    }
+
+    private var iOweItems: [CashFlowItem] {
+        cashFlowItems.filter { !$0.isOwedToMe }
+    }
+
+    private var totalOwedToMe: Double {
+        owedToMeItems.reduce(0) { $0 + $1.amount }
+    }
+
+    private var totalIOwe: Double {
+        iOweItems.reduce(0) { $0 + $1.amount }
+    }
+
+    private var netCashFlow: Double {
+        totalOwedToMe - totalIOwe
+    }
+
+    // MARK: - Subviews
+
+    private var summaryCard: some View {
+        HStack(spacing: 10) {
+            summaryPill(label: "Owed to Me", amount: totalOwedToMe, tint: .green)
+            summaryPill(label: "I Owe", amount: totalIOwe, tint: .red)
+            summaryPill(label: "Net", amount: netCashFlow, tint: netCashFlow >= 0 ? .green : .red)
+        }
+    }
+
+    private func summaryPill(label: String, amount: Double, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label.uppercased())
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(.secondary)
+            Text(amount.formattedAsCurrency())
+                .font(.subheadline.weight(.bold))
+                .foregroundColor(tint)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .contentTransition(.numericText())
+                .animation(.snappy, value: amount)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private var addMenu: some View {
         Menu {
-            Button(action: { showingAddOwedToMe = true }) {
+            Button { presentedSheet = .addOwedToMe } label: {
                 Label("Add Owed to Me", systemImage: "arrow.down.circle.fill")
             }
-            Button(action: { showingAddIOwe = true }) {
+            Button { presentedSheet = .addIOwe } label: {
                 Label("Add I Owe", systemImage: "arrow.up.circle.fill")
             }
             Divider()
-            Button(action: { showingBulkAdd = true }) {
+            Button { presentedSheet = .bulkAdd } label: {
                 Label("Bulk Add (Split Bill)", systemImage: "person.3.fill")
             }
         } label: {
@@ -101,12 +145,46 @@ struct CashFlowTabView: View {
         }
     }
 
+    @ViewBuilder
+    private func sheetContent(for sheet: PresentedSheet) -> some View {
+        switch sheet {
+        case .addOwedToMe:
+            NavigationStack {
+                AddCashFlowItemView(isDefaultOwedToMe: true)
+                    .environment(\.managedObjectContext, viewContext)
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        case .addIOwe:
+            NavigationStack {
+                AddCashFlowItemView(isDefaultOwedToMe: false)
+                    .environment(\.managedObjectContext, viewContext)
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        case .bulkAdd:
+            NavigationStack {
+                BulkAddCashFlowItemsView()
+                    .environment(\.managedObjectContext, viewContext)
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        case .edit(let item):
+            NavigationStack {
+                EditCashFlowItemView(item: item)
+                    .environment(\.managedObjectContext, viewContext)
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
     private func cashFlowSection(title: String, items: [CashFlowItem], emptyMessage: String, emptyImage: String) -> some View {
         Section(header:
-                    Text(title)
-                    .font(.title2)
-                    .bold()
-                    .foregroundColor(.primary)
+            Text(title)
+                .font(.title2)
+                .bold()
+                .foregroundColor(.primary)
         ) {
             if items.isEmpty {
                 EmptyStateView(message: emptyMessage, imageName: emptyImage)
@@ -115,7 +193,7 @@ struct CashFlowTabView: View {
             } else {
                 ForEach(items, id: \.objectID) { item in
                     CashFlowRowView(item: item) {
-                        cashFlowItemToEdit = item
+                        presentedSheet = .edit(item)
                     }
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
@@ -124,7 +202,7 @@ struct CashFlowTabView: View {
                             Label("Delete", systemImage: "trash")
                         }
                         Button {
-                            cashFlowItemToEdit = item
+                            presentedSheet = .edit(item)
                         } label: {
                             Label("Edit", systemImage: "pencil")
                         }
@@ -137,10 +215,6 @@ struct CashFlowTabView: View {
 
     private func delete(_ item: CashFlowItem) {
         viewContext.delete(item)
-        saveContext()
-    }
-
-    private func saveContext() {
         do {
             try viewContext.save()
         } catch {

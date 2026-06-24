@@ -17,9 +17,10 @@ struct CashFlowRowView: View {
                         .accessibilityIdentifier("cashFlowType")
                 }
                 Spacer()
-                Text(formattedAmount())
+                Text(signedAmount.formattedAsCurrency())
                     .font(.headline)
                     .foregroundColor(item.isOwedToMe ? .green : .red)
+                    .monospacedDigit()
                     .accessibilityIdentifier("cashFlowAmount")
             }
             .padding(.horizontal, 8)
@@ -27,9 +28,8 @@ struct CashFlowRowView: View {
         .buttonStyle(PlainButtonStyle())
     }
 
-    private func formattedAmount() -> String {
-        let amount = abs(item.amount)
-        let prefix = item.isOwedToMe ? "$" : "-$"
-        return "\(prefix)\(String(format: "%.2f", amount))"
+    private var signedAmount: Double {
+        let magnitude = abs(item.amount)
+        return item.isOwedToMe ? magnitude : -magnitude
     }
 }

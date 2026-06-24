@@ -40,9 +40,10 @@ struct NetIncomeTabView: View {
                 )
                 .ignoresSafeArea()
                 VStack {
-                    NetIncomeView()
+                    NetIncomeBalanceCard()
                         .padding(.horizontal)
                         .padding(.top)
+                        .padding(.bottom, 16)
 
                     // Add Income/Expense Buttons
                     HStack(spacing: 20) {

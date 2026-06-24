@@ -21,13 +21,10 @@ struct SettingsTabView: View {
     @State private var showingAddQuickAddTransaction = false
     @State private var quickAddTransactionToEdit: QuickAddTransaction?
 
-    /// Trigger for refreshing the List when edits complete
-    @State private var refreshID = UUID()
-
     let daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 LinearGradient(
                     gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
@@ -40,11 +37,11 @@ struct SettingsTabView: View {
                     predefinedGroup
                     quickAddGroup
                 }
-                .id(refreshID)
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
             }
-            .navigationBarTitle("Settings", displayMode: .inline)
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     EditButton()
@@ -71,38 +68,28 @@ struct SettingsTabView: View {
                     .accessibilityIdentifier("Settings_AddMenu")
                 }
             }
-            // Add Predefined
             .sheet(isPresented: $showingAddPredefinedTransaction) {
-                NavigationView {
+                NavigationStack {
                     AddPredefinedTransactionView()
                         .environment(\.managedObjectContext, viewContext)
                 }
             }
-            // Edit Predefined
             .sheet(item: $predefinedTransactionToEdit) { transaction in
-                NavigationView {
+                NavigationStack {
                     EditPredefinedTransactionView(transaction: transaction)
                         .environment(\.managedObjectContext, viewContext)
                 }
-                .onDisappear {
-                    refreshID = UUID()
-                }
             }
-            // Add Quick Add
             .sheet(isPresented: $showingAddQuickAddTransaction) {
-                NavigationView {
+                NavigationStack {
                     AddQuickAddTransactionView()
                         .environment(\.managedObjectContext, viewContext)
                 }
             }
-            // Edit Quick Add
             .sheet(item: $quickAddTransactionToEdit) { transaction in
-                NavigationView {
+                NavigationStack {
                     EditQuickAddTransactionView(transaction: transaction)
                         .environment(\.managedObjectContext, viewContext)
-                }
-                .onDisappear {
-                    refreshID = UUID()
                 }
             }
         }
@@ -127,15 +114,11 @@ struct SettingsTabView: View {
                         SectionSubHeader(text: day)
 
                         ForEach(items, id: \.id) { transaction in
-                            SettingsTransactionRow(
-                                desc: transaction.desc ?? "No Description",
-                                amount: transaction.amount,
-                                isIncome: transaction.isIncome
-                            )
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                predefinedTransactionToEdit = transaction
-                            }
+                            PredefinedTransactionRow(transaction: transaction)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    predefinedTransactionToEdit = transaction
+                                }
                         }
                         .onDelete { offsets in
                             deletePredefinedTransaction(offsets, from: items)
@@ -168,15 +151,11 @@ struct SettingsTabView: View {
                     SectionSubHeader(text: "Income", tint: .green)
 
                     ForEach(income, id: \.id) { transaction in
-                        SettingsTransactionRow(
-                            desc: transaction.desc ?? "No Description",
-                            amount: transaction.amount,
-                            isIncome: transaction.isIncome
-                        )
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            quickAddTransactionToEdit = transaction
-                        }
+                        QuickAddTransactionRow(transaction: transaction)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                quickAddTransactionToEdit = transaction
+                            }
                     }
                     .onDelete { offsets in
                         deleteQuickAddTransaction(offsets: offsets, from: income)
@@ -187,15 +166,11 @@ struct SettingsTabView: View {
                     SectionSubHeader(text: "Expense", tint: .red)
 
                     ForEach(expense, id: \.id) { transaction in
-                        SettingsTransactionRow(
-                            desc: transaction.desc ?? "No Description",
-                            amount: transaction.amount,
-                            isIncome: transaction.isIncome
-                        )
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            quickAddTransactionToEdit = transaction
-                        }
+                        QuickAddTransactionRow(transaction: transaction)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                quickAddTransactionToEdit = transaction
+                            }
                     }
                     .onDelete { offsets in
                         deleteQuickAddTransaction(offsets: offsets, from: expense)
@@ -249,6 +224,32 @@ private struct SectionSubHeader: View {
     }
 }
 
+// MARK: - Observed wrappers (pick up CoreData property changes after edits)
+
+private struct PredefinedTransactionRow: View {
+    @ObservedObject var transaction: PredefinedTransaction
+
+    var body: some View {
+        SettingsTransactionRow(
+            desc: transaction.desc ?? "No Description",
+            amount: transaction.amount,
+            isIncome: transaction.isIncome
+        )
+    }
+}
+
+private struct QuickAddTransactionRow: View {
+    @ObservedObject var transaction: QuickAddTransaction
+
+    var body: some View {
+        SettingsTransactionRow(
+            desc: transaction.desc ?? "No Description",
+            amount: transaction.amount,
+            isIncome: transaction.isIncome
+        )
+    }
+}
+
 // MARK: - Shared row layout for predefined + quick-add
 
 private struct SettingsTransactionRow: View {
@@ -273,7 +274,7 @@ private struct SettingsTransactionRow: View {
 
             Spacer()
 
-            Text(formattedAmount)
+            Text(signedAmount.formattedAsCurrency())
                 .font(.body.weight(.semibold))
                 .foregroundColor(isIncome ? .green : .red)
                 .monospacedDigit()
@@ -281,9 +282,8 @@ private struct SettingsTransactionRow: View {
         .padding(.vertical, 4)
     }
 
-    private var formattedAmount: String {
-        let absAmount = abs(amount)
-        let prefix = isIncome ? "$" : "-$"
-        return "\(prefix)\(String(format: "%.2f", absAmount))"
+    private var signedAmount: Double {
+        let magnitude = abs(amount)
+        return isIncome ? magnitude : -magnitude
     }
 }

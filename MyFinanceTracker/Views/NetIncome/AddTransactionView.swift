@@ -131,7 +131,7 @@ struct AddTransactionView: View {
                                                     .font(.subheadline)
                                                     .fontWeight(.semibold)
                                                     .foregroundColor(.primary)
-                                                Text("$\(String(format: "%.2f", transaction.amount))")
+                                                Text(transaction.amount.formattedAsCurrency())
                                                     .font(.caption)
                                                     .foregroundColor(transaction.isIncome ? .green : .red)
                                             }

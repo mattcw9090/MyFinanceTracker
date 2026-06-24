@@ -52,12 +52,20 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		FB4BF0942FEBF6070054C861 /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
 		FB6D993E2CAB134A0041863A = {
 			isa = PBXGroup;
 			children = (
 				FB6D99492CAB134A0041863A /* MyFinanceTracker */,
 				FB6D99692CAB134B0041863A /* MyFinanceTrackerUITests */,
 				FB6D99482CAB134A0041863A /* Products */,
+				FB4BF0942FEBF6070054C861 /* Extensions */,
 			);
 			sourceTree = "<group>";
 		};
