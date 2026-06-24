@@ -1,10 +1,10 @@
 import SwiftUI
-import CoreData
+import SwiftData
 
 struct NetIncomeTabView: View {
-    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var netIncomeManager: NetIncomeManager
-    
+
     enum ActiveAlert: Identifiable {
         case reset, initializeWeek, success, noPredefinedTransactions
         var id: Int { hashValue }
@@ -16,14 +16,13 @@ struct NetIncomeTabView: View {
     @State private var showingAddExpense = false
     @State private var selectedDay: String = Weekday.today
     @State private var activeAlert: ActiveAlert?
-    
-    @FetchRequest(
-        entity: Transaction.entity(),
-        sortDescriptors: [NSSortDescriptor(keyPath: \Transaction.dayOfWeek, ascending: true)],
-        predicate: NSPredicate(format: "isCompleted == false"),
+
+    @Query(
+        filter: #Predicate<Transaction> { !$0.isCompleted },
+        sort: \Transaction.dayOfWeek,
         animation: .default
     )
-    private var transactions: FetchedResults<Transaction>
+    private var transactions: [Transaction]
 
     var body: some View {
         NavigationStack {
@@ -57,7 +56,6 @@ struct NetIncomeTabView: View {
                         .accessibilityIdentifier("addIncomeButton")
                         .sheet(isPresented: $showingAddIncome) {
                             AddTransactionView(isIncome: true, selectedDay: $selectedDay)
-                                .environment(\.managedObjectContext, viewContext)
                                 .environmentObject(netIncomeManager)
                         }
 
@@ -76,7 +74,6 @@ struct NetIncomeTabView: View {
                         .accessibilityIdentifier("addExpenseButton")
                         .sheet(isPresented: $showingAddExpense) {
                             AddTransactionView(isIncome: false, selectedDay: $selectedDay)
-                                .environment(\.managedObjectContext, viewContext)
                                 .environmentObject(netIncomeManager)
                         }
                     }
@@ -164,16 +161,8 @@ struct NetIncomeTabView: View {
     }
 
     private func resetAll() {
-        let fetchRequest: NSFetchRequest<NSFetchRequestResult> = Transaction.fetchRequest()
-        let batchDeleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
-        batchDeleteRequest.resultType = .resultTypeObjectIDs
-
         do {
-            let result = try viewContext.execute(batchDeleteRequest) as? NSBatchDeleteResult
-            if let objectIDs = result?.result as? [NSManagedObjectID] {
-                let changes: [AnyHashable: Any] = [NSDeletedObjectsKey: objectIDs]
-                NSManagedObjectContext.mergeChanges(fromRemoteContextSave: changes, into: [viewContext])
-            }
+            try modelContext.delete(model: Transaction.self)
             netIncomeManager.resetNetIncome()
             activeAlert = .success
         } catch {
@@ -184,28 +173,33 @@ struct NetIncomeTabView: View {
     private func initializeWeek() {
         resetAll()
 
-        let fetchRequest: NSFetchRequest<PredefinedTransaction> = PredefinedTransaction.fetchRequest()
-        fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \PredefinedTransaction.dayOfWeek, ascending: true)]
-
         do {
-            let predefinedTransactions = try viewContext.fetch(fetchRequest)
+            let descriptor = FetchDescriptor<PredefinedTransaction>(
+                sortBy: [SortDescriptor(\.dayOfWeek)]
+            )
+            let predefinedTransactions = try modelContext.fetch(descriptor)
 
             if predefinedTransactions.isEmpty {
                 activeAlert = .noPredefinedTransactions
             } else {
                 for predefinedTransaction in predefinedTransactions {
-                    let newTransaction = Transaction(context: viewContext)
-                    newTransaction.id = UUID()
-                    newTransaction.desc = predefinedTransaction.desc
-                    newTransaction.amount = predefinedTransaction.amount
-                    newTransaction.dayOfWeek = predefinedTransaction.dayOfWeek
-                    newTransaction.isCompleted = false
-                    newTransaction.isIncome = predefinedTransaction.isIncome
+                    let newTransaction = Transaction(
+                        desc: predefinedTransaction.desc,
+                        amount: predefinedTransaction.amount,
+                        dayOfWeek: predefinedTransaction.dayOfWeek,
+                        isCompleted: false,
+                        isIncome: predefinedTransaction.isIncome
+                    )
+                    modelContext.insert(newTransaction)
 
-                    netIncomeManager.adjustNetIncome(by: predefinedTransaction.amount, isIncome: predefinedTransaction.isIncome, isDeletion: false)
+                    netIncomeManager.adjustNetIncome(
+                        by: predefinedTransaction.amount,
+                        isIncome: predefinedTransaction.isIncome,
+                        isDeletion: false
+                    )
                 }
 
-                try viewContext.save()
+                try modelContext.save()
                 activeAlert = .success
             }
         } catch {

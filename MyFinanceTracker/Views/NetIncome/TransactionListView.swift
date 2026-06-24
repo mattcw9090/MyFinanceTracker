@@ -1,10 +1,11 @@
 import SwiftUI
+import SwiftData
 
 struct TransactionListView: View {
     let day: String
     let transactions: [Transaction]
 
-    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var netIncomeManager: NetIncomeManager
 
     var body: some View {
@@ -40,7 +41,7 @@ struct TransactionListView: View {
 
     private func deleteTransaction(_ transaction: Transaction) {
         netIncomeManager.adjustNetIncome(by: transaction.amount, isIncome: transaction.isIncome, isDeletion: true)
-        viewContext.delete(transaction)
-        viewContext.saveOrLog()
+        modelContext.delete(transaction)
+        modelContext.saveOrLog()
     }
 }

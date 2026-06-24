@@ -1,7 +1,8 @@
 import SwiftUI
+import SwiftData
 
 struct DuplicatePredefinedTransactionView: View {
-    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) var dismiss
 
     let source: PredefinedTransaction
@@ -78,16 +79,16 @@ struct DuplicatePredefinedTransactionView: View {
     private func duplicate() {
         guard !selectedDays.isEmpty else { return }
         for day in selectedDays {
-            let copy = PredefinedTransaction(context: viewContext)
-            copy.id = UUID()
-            copy.desc = source.desc
-            copy.amount = source.amount
-            copy.isIncome = source.isIncome
-            copy.dayOfWeek = day
+            modelContext.insert(PredefinedTransaction(
+                desc: source.desc,
+                amount: source.amount,
+                dayOfWeek: day,
+                isIncome: source.isIncome
+            ))
         }
 
         do {
-            try viewContext.save()
+            try modelContext.save()
             dismiss()
         } catch {
             alertMessage = "Failed to duplicate: \(error.localizedDescription)"

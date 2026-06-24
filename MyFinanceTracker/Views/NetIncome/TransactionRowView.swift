@@ -1,9 +1,9 @@
 import SwiftUI
-import CoreData
+import SwiftData
 
 struct TransactionRowView: View {
-    @ObservedObject var transaction: Transaction
-    @Environment(\.managedObjectContext) private var viewContext
+    @Bindable var transaction: Transaction
+    @Environment(\.modelContext) private var modelContext
 
     @State private var showAddToCashFlowConfirmation = false
     @State private var showAdditionalCostInput = false
@@ -136,24 +136,24 @@ struct TransactionRowView: View {
         let share = names.isEmpty ? total : total / Double(names.count)
 
         if names.isEmpty {
-            let item = CashFlowItem(context: viewContext)
-            item.id = UUID()
-            item.name = transaction.desc ?? "Unnamed Transaction"
-            item.amount = total
-            item.isOwedToMe = true
+            modelContext.insert(CashFlowItem(
+                name: transaction.desc ?? "Unnamed Transaction",
+                amount: total,
+                isOwedToMe: true
+            ))
         } else {
             for name in names {
-                let item = CashFlowItem(context: viewContext)
-                item.id = UUID()
-                item.name = name
-                item.amount = share
-                item.isOwedToMe = true
+                modelContext.insert(CashFlowItem(
+                    name: name,
+                    amount: share,
+                    isOwedToMe: true
+                ))
             }
         }
         saveContext()
     }
 
     private func saveContext() {
-        viewContext.saveOrLog()
+        modelContext.saveOrLog()
     }
 }

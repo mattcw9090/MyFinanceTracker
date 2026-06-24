@@ -1,6 +1,6 @@
-import CoreData
+import SwiftData
 
-extension NSManagedObjectContext {
+extension ModelContext {
     /// Saves the context if it has changes, logging failures instead of throwing.
     /// Use for non-critical saves where a print log is acceptable.
     func saveOrLog(_ label: StaticString = #function) {

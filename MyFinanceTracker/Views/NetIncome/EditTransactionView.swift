@@ -1,11 +1,11 @@
 import SwiftUI
-import CoreData
+import SwiftData
 
 struct EditTransactionView: View {
-    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) var dismiss
 
-    @ObservedObject var transaction: Transaction
+    @Bindable var transaction: Transaction
 
     @State private var descriptionText: String
     @State private var amount: String
@@ -109,7 +109,7 @@ struct EditTransactionView: View {
         netIncomeManager.adjustNetIncome(by: newAmount, isIncome: isIncome, isDeletion: false)
 
         do {
-            try viewContext.save()
+            try modelContext.save()
             dismiss()
         } catch {
             alertMessage = "Failed to edit transaction: \(error.localizedDescription)"

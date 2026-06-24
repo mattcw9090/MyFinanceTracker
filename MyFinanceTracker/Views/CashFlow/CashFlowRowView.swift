@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct CashFlowRowView: View {
-    @ObservedObject var item: CashFlowItem
+    @Bindable var item: CashFlowItem
     var onTap: () -> Void
 
     var body: some View {

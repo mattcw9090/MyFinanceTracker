@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct CashFlowItemFormView: View {
     enum Mode {
@@ -20,7 +21,7 @@ struct CashFlowItemFormView: View {
         }
     }
 
-    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
     let mode: Mode
@@ -104,8 +105,8 @@ struct CashFlowItemFormView: View {
         let target: CashFlowItem
         switch mode {
         case .add:
-            target = CashFlowItem(context: viewContext)
-            target.id = UUID()
+            target = CashFlowItem()
+            modelContext.insert(target)
         case .edit(let item):
             target = item
         }
@@ -115,7 +116,7 @@ struct CashFlowItemFormView: View {
         target.isOwedToMe = isOwedToMe
 
         do {
-            try viewContext.save()
+            try modelContext.save()
             dismiss()
         } catch {
             alertMessage = "Failed to save cash flow item: \(error.localizedDescription)"

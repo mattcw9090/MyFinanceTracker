@@ -1,11 +1,11 @@
 import SwiftUI
-import CoreData
+import SwiftData
 
 struct AddTransactionView: View {
     let isIncome: Bool
     @Binding var selectedDay: String
 
-    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) var dismiss
 
     @State private var descriptionText = ""
@@ -18,18 +18,15 @@ struct AddTransactionView: View {
     @State private var showAlert = false
     @State private var alertMessage = ""
 
-    @FetchRequest private var quickAddTransactions: FetchedResults<QuickAddTransaction>
+    @Query private var quickAddTransactions: [QuickAddTransaction]
 
     init(isIncome: Bool, selectedDay: Binding<String>) {
         self.isIncome = isIncome
         _selectedDay = selectedDay
 
-        let predicate = NSPredicate(format: "isIncome == %@", NSNumber(value: isIncome))
-        let sortDescriptors = [NSSortDescriptor(keyPath: \QuickAddTransaction.desc, ascending: true)]
-        _quickAddTransactions = FetchRequest(
-            entity: QuickAddTransaction.entity(),
-            sortDescriptors: sortDescriptors,
-            predicate: predicate
+        _quickAddTransactions = Query(
+            filter: #Predicate<QuickAddTransaction> { $0.isIncome == isIncome },
+            sort: \QuickAddTransaction.desc
         )
     }
 
@@ -215,18 +212,19 @@ struct AddTransactionView: View {
     }
 
     private func createTransaction(amount: Double, desc: String, isIncome: Bool) {
-        let newTransaction = Transaction(context: viewContext)
-        newTransaction.id = UUID()
-        newTransaction.amount = amount
-        newTransaction.desc = desc
-        newTransaction.dayOfWeek = selectedDay
-        newTransaction.isCompleted = false
-        newTransaction.isIncome = isIncome
+        let newTransaction = Transaction(
+            desc: desc,
+            amount: amount,
+            dayOfWeek: selectedDay,
+            isCompleted: false,
+            isIncome: isIncome
+        )
+        modelContext.insert(newTransaction)
 
         netIncomeManager.adjustNetIncome(by: amount, isIncome: isIncome, isDeletion: false)
 
         do {
-            try viewContext.save()
+            try modelContext.save()
             dismiss()
         } catch {
             alertMessage = "Failed to add transaction: \(error.localizedDescription)"

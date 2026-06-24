@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct PredefinedTransactionFormView: View {
     enum Mode {
@@ -20,7 +21,7 @@ struct PredefinedTransactionFormView: View {
         }
     }
 
-    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
     let mode: Mode
@@ -120,8 +121,8 @@ struct PredefinedTransactionFormView: View {
         let target: PredefinedTransaction
         switch mode {
         case .add:
-            target = PredefinedTransaction(context: viewContext)
-            target.id = UUID()
+            target = PredefinedTransaction()
+            modelContext.insert(target)
         case .edit(let tx):
             target = tx
         }
@@ -132,7 +133,7 @@ struct PredefinedTransactionFormView: View {
         target.isIncome = isIncome
 
         do {
-            try viewContext.save()
+            try modelContext.save()
             dismiss()
         } catch {
             alertMessage = "Failed to save predefined transaction: \(error.localizedDescription)"

@@ -1,36 +1,52 @@
-import CoreData
+import Foundation
+import SwiftData
 
-struct PersistenceController {
-    static let shared = PersistenceController()
+// MARK: - Versioned schema (add a new VersionedSchema below for each future change)
 
-    let container: NSPersistentContainer
+enum AppSchemaV1: VersionedSchema {
+    static var versionIdentifier = Schema.Version(1, 0, 0)
 
-    init(inMemory: Bool = false) {
-        container = NSPersistentContainer(name: "MyFinanceTracker")
-
-        if let description = container.persistentStoreDescriptions.first {
-            if inMemory {
-                description.url = URL(fileURLWithPath: "/dev/null")
-            }
-            // Lightweight migration: Core Data infers a mapping model when the
-            // schema changes additively (new attributes with default values,
-            // newly-optional attributes, renames via renamingIdentifier).
-            // For anything more complex, add a new model version in
-            // MyFinanceTracker.xcdatamodeld (Editor → Add Model Version) so
-            // Core Data has an explicit source-to-destination pair to map.
-            description.shouldMigrateStoreAutomatically = true
-            description.shouldInferMappingModelAutomatically = true
-        }
-
-        container.loadPersistentStores { _, error in
-            if let error = error as NSError? {
-                // Fail loudly. We never silently destroy the user's store —
-                // if migration is failing, the right fix is to add a model
-                // version, not to discard their data.
-                fatalError("Core Data load failed: \(error), \(error.userInfo)")
-            }
-        }
-
-        container.viewContext.automaticallyMergesChangesFromParent = true
+    static var models: [any PersistentModel.Type] {
+        [
+            CashFlowItem.self,
+            NetIncomeEntity.self,
+            PredefinedTransaction.self,
+            QuickAddTransaction.self,
+            Transaction.self
+        ]
     }
+}
+
+/// Lists all schema versions in chronological order and the migration stages
+/// connecting them. SwiftData performs lightweight migration between
+/// consecutive versions automatically; add a `.custom(...)` stage when a
+/// change requires data transformation.
+enum AppMigrationPlan: SchemaMigrationPlan {
+    static var schemas: [any VersionedSchema.Type] {
+        [AppSchemaV1.self]
+    }
+
+    static var stages: [MigrationStage] {
+        []
+    }
+}
+
+// MARK: - Shared container
+
+enum AppContainer {
+    /// One container, shared by SwiftUI's `.modelContainer` modifier and by
+    /// `NetIncomeManager`. Both must use the same store to see the same data.
+    static let shared: ModelContainer = {
+        do {
+            let schema = Schema(versionedSchema: AppSchemaV1.self)
+            let config = ModelConfiguration(schema: schema)
+            return try ModelContainer(
+                for: schema,
+                migrationPlan: AppMigrationPlan.self,
+                configurations: [config]
+            )
+        } catch {
+            fatalError("Failed to create ModelContainer: \(error)")
+        }
+    }()
 }

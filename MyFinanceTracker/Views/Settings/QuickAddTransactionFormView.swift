@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct QuickAddTransactionFormView: View {
     enum Mode {
@@ -20,7 +21,7 @@ struct QuickAddTransactionFormView: View {
         }
     }
 
-    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
     let mode: Mode
@@ -107,8 +108,8 @@ struct QuickAddTransactionFormView: View {
         let target: QuickAddTransaction
         switch mode {
         case .add:
-            target = QuickAddTransaction(context: viewContext)
-            target.id = UUID()
+            target = QuickAddTransaction()
+            modelContext.insert(target)
         case .edit(let tx):
             target = tx
         }
@@ -118,7 +119,7 @@ struct QuickAddTransactionFormView: View {
         target.isIncome = isIncome
 
         do {
-            try viewContext.save()
+            try modelContext.save()
             dismiss()
         } catch {
             alertMessage = "Failed to save quick add transaction: \(error.localizedDescription)"

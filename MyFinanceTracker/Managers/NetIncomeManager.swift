@@ -1,5 +1,5 @@
 import Foundation
-import CoreData
+import SwiftData
 
 @MainActor
 final class NetIncomeManager: ObservableObject {
@@ -11,6 +11,8 @@ final class NetIncomeManager: ObservableObject {
 
     private var saveTask: Task<Void, Never>?
 
+    private var context: ModelContext { AppContainer.shared.mainContext }
+
     private init() {
         loadNetIncome()
     }
@@ -21,12 +23,8 @@ final class NetIncomeManager: ObservableObject {
     }
 
     func resetNetIncome() {
-        let context = PersistenceController.shared.container.viewContext
-        let fetchRequest: NSFetchRequest<NSFetchRequestResult> = NetIncomeEntity.fetchRequest()
-        let batchDeleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
-
         do {
-            try context.execute(batchDeleteRequest)
+            try context.delete(model: NetIncomeEntity.self)
             netIncome = 0.0
         } catch {
             print("Failed to reset net income: \(error.localizedDescription)")
@@ -45,12 +43,15 @@ final class NetIncomeManager: ObservableObject {
     }
 
     private func saveNetIncome() {
-        let context = PersistenceController.shared.container.viewContext
-        let fetchRequest: NSFetchRequest<NetIncomeEntity> = NetIncomeEntity.fetchRequest()
         do {
-            let results = try context.fetch(fetchRequest)
-            let entity = results.first ?? NetIncomeEntity(context: context)
-            entity.value = netIncome
+            let descriptor = FetchDescriptor<NetIncomeEntity>()
+            let results = try context.fetch(descriptor)
+            if let entity = results.first {
+                entity.value = netIncome
+            } else {
+                let entity = NetIncomeEntity(value: netIncome)
+                context.insert(entity)
+            }
             try context.save()
         } catch {
             print("Failed to save net income: \(error.localizedDescription)")
@@ -58,15 +59,14 @@ final class NetIncomeManager: ObservableObject {
     }
 
     private func loadNetIncome() {
-        let context = PersistenceController.shared.container.viewContext
-        let fetchRequest: NSFetchRequest<NetIncomeEntity> = NetIncomeEntity.fetchRequest()
         do {
-            let results = try context.fetch(fetchRequest)
+            let descriptor = FetchDescriptor<NetIncomeEntity>()
+            let results = try context.fetch(descriptor)
             if let entity = results.first {
                 netIncome = entity.value
             } else {
-                let entity = NetIncomeEntity(context: context)
-                entity.value = 0.0
+                let entity = NetIncomeEntity(value: 0.0)
+                context.insert(entity)
                 try context.save()
             }
         } catch {

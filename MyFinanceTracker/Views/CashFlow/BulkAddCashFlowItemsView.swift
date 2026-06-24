@@ -1,7 +1,8 @@
 import SwiftUI
+import SwiftData
 
 struct BulkAddCashFlowItemsView: View {
-    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) var dismiss
 
     @State private var amount = ""
@@ -193,15 +194,15 @@ struct BulkAddCashFlowItemsView: View {
         guard share > 0, !toCreate.isEmpty else { return }
 
         for name in toCreate {
-            let item = CashFlowItem(context: viewContext)
-            item.id = UUID()
-            item.name = name
-            item.amount = share
-            item.isOwedToMe = isOwedToMe
+            modelContext.insert(CashFlowItem(
+                name: name,
+                amount: share,
+                isOwedToMe: isOwedToMe
+            ))
         }
 
         do {
-            try viewContext.save()
+            try modelContext.save()
             dismiss()
         } catch {
             alertMessage = "Failed to save items: \(error.localizedDescription)"

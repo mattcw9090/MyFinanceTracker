@@ -1,20 +1,11 @@
 import SwiftUI
-import CoreData
+import SwiftData
 
 struct SettingsTabView: View {
-    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.modelContext) private var modelContext
 
-    @FetchRequest(
-        entity: PredefinedTransaction.entity(),
-        sortDescriptors: [NSSortDescriptor(keyPath: \PredefinedTransaction.dayOfWeek, ascending: true)]
-    )
-    private var predefinedTransactions: FetchedResults<PredefinedTransaction>
-
-    @FetchRequest(
-        entity: QuickAddTransaction.entity(),
-        sortDescriptors: [NSSortDescriptor(keyPath: \QuickAddTransaction.desc, ascending: true)]
-    )
-    private var quickAddTransactions: FetchedResults<QuickAddTransaction>
+    @Query(sort: \PredefinedTransaction.dayOfWeek) private var predefinedTransactions: [PredefinedTransaction]
+    @Query(sort: \QuickAddTransaction.desc) private var quickAddTransactions: [QuickAddTransaction]
 
     @State private var showingAddPredefinedTransaction = false
     @State private var predefinedTransactionToEdit: PredefinedTransaction?
@@ -71,23 +62,18 @@ struct SettingsTabView: View {
             }
             .sheet(isPresented: $showingAddPredefinedTransaction) {
                 PredefinedTransactionFormView(mode: .add)
-                    .environment(\.managedObjectContext, viewContext)
             }
             .sheet(item: $predefinedTransactionToEdit) { transaction in
                 PredefinedTransactionFormView(mode: .edit(transaction))
-                    .environment(\.managedObjectContext, viewContext)
             }
             .sheet(item: $predefinedTransactionToDuplicate) { transaction in
                 DuplicatePredefinedTransactionView(source: transaction)
-                    .environment(\.managedObjectContext, viewContext)
             }
             .sheet(isPresented: $showingAddQuickAddTransaction) {
                 QuickAddTransactionFormView(mode: .add)
-                    .environment(\.managedObjectContext, viewContext)
             }
             .sheet(item: $quickAddTransactionToEdit) { transaction in
                 QuickAddTransactionFormView(mode: .edit(transaction))
-                    .environment(\.managedObjectContext, viewContext)
             }
         }
     }
@@ -203,15 +189,15 @@ struct SettingsTabView: View {
 
     private func deletePredefinedTransaction(_ offsets: IndexSet, from transactionsForDay: [PredefinedTransaction]) {
         withAnimation {
-            offsets.map { transactionsForDay[$0] }.forEach(viewContext.delete)
-            viewContext.saveOrLog()
+            offsets.map { transactionsForDay[$0] }.forEach(modelContext.delete)
+            modelContext.saveOrLog()
         }
     }
 
     private func deleteQuickAddTransaction(offsets: IndexSet, from transactionsSubset: [QuickAddTransaction]) {
         withAnimation {
-            offsets.map { transactionsSubset[$0] }.forEach(viewContext.delete)
-            viewContext.saveOrLog()
+            offsets.map { transactionsSubset[$0] }.forEach(modelContext.delete)
+            modelContext.saveOrLog()
         }
     }
 }
@@ -236,7 +222,7 @@ private struct SectionSubHeader: View {
 // MARK: - Observed wrappers (pick up CoreData property changes after edits)
 
 private struct PredefinedTransactionRow: View {
-    @ObservedObject var transaction: PredefinedTransaction
+    @Bindable var transaction: PredefinedTransaction
 
     var body: some View {
         SettingsTransactionRow(
@@ -248,7 +234,7 @@ private struct PredefinedTransactionRow: View {
 }
 
 private struct QuickAddTransactionRow: View {
-    @ObservedObject var transaction: QuickAddTransaction
+    @Bindable var transaction: QuickAddTransaction
 
     var body: some View {
         SettingsTransactionRow(

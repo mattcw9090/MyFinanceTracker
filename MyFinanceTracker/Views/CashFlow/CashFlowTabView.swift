@@ -1,13 +1,10 @@
 import SwiftUI
+import SwiftData
 
 struct CashFlowTabView: View {
-    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.modelContext) private var modelContext
 
-    @FetchRequest(
-        entity: CashFlowItem.entity(),
-        sortDescriptors: [NSSortDescriptor(keyPath: \CashFlowItem.name, ascending: true)]
-    )
-    private var cashFlowItems: FetchedResults<CashFlowItem>
+    @Query(sort: \CashFlowItem.name) private var cashFlowItems: [CashFlowItem]
 
     @State private var presentedSheet: PresentedSheet?
 
@@ -22,7 +19,7 @@ struct CashFlowTabView: View {
             case .addOwedToMe: return "addOwedToMe"
             case .addIOwe: return "addIOwe"
             case .bulkAdd: return "bulkAdd"
-            case .edit(let item): return "edit-\(item.objectID.uriRepresentation().absoluteString)"
+            case .edit(let item): return "edit-\(item.id.uuidString)"
             }
         }
     }
@@ -151,28 +148,24 @@ struct CashFlowTabView: View {
         case .addOwedToMe:
             NavigationStack {
                 CashFlowItemFormView(mode: .add(defaultOwedToMe: true))
-                    .environment(\.managedObjectContext, viewContext)
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         case .addIOwe:
             NavigationStack {
                 CashFlowItemFormView(mode: .add(defaultOwedToMe: false))
-                    .environment(\.managedObjectContext, viewContext)
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         case .bulkAdd:
             NavigationStack {
                 BulkAddCashFlowItemsView()
-                    .environment(\.managedObjectContext, viewContext)
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         case .edit(let item):
             NavigationStack {
                 CashFlowItemFormView(mode: .edit(item))
-                    .environment(\.managedObjectContext, viewContext)
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
@@ -191,7 +184,7 @@ struct CashFlowTabView: View {
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
             } else {
-                ForEach(items, id: \.objectID) { item in
+                ForEach(items, id: \.id) { item in
                     CashFlowRowView(item: item) {
                         presentedSheet = .edit(item)
                     }
@@ -225,13 +218,13 @@ struct CashFlowTabView: View {
     }
 
     private func delete(_ item: CashFlowItem) {
-        viewContext.delete(item)
-        viewContext.saveOrLog()
+        modelContext.delete(item)
+        modelContext.saveOrLog()
     }
 
     private func toggleSettled(_ item: CashFlowItem) {
         item.isSettled.toggle()
-        viewContext.saveOrLog()
+        modelContext.saveOrLog()
     }
 }
 
