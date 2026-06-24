@@ -18,6 +18,7 @@ struct SettingsTabView: View {
 
     @State private var showingAddPredefinedTransaction = false
     @State private var predefinedTransactionToEdit: PredefinedTransaction?
+    @State private var predefinedTransactionToDuplicate: PredefinedTransaction?
     @State private var showingAddQuickAddTransaction = false
     @State private var quickAddTransactionToEdit: QuickAddTransaction?
 
@@ -80,6 +81,10 @@ struct SettingsTabView: View {
                         .environment(\.managedObjectContext, viewContext)
                 }
             }
+            .sheet(item: $predefinedTransactionToDuplicate) { transaction in
+                DuplicatePredefinedTransactionView(source: transaction)
+                    .environment(\.managedObjectContext, viewContext)
+            }
             .sheet(isPresented: $showingAddQuickAddTransaction) {
                 NavigationStack {
                     AddQuickAddTransactionView()
@@ -118,6 +123,26 @@ struct SettingsTabView: View {
                                 .contentShape(Rectangle())
                                 .onTapGesture {
                                     predefinedTransactionToEdit = transaction
+                                }
+                                .contextMenu {
+                                    Button {
+                                        predefinedTransactionToEdit = transaction
+                                    } label: {
+                                        Label("Edit", systemImage: "pencil")
+                                    }
+                                    Button {
+                                        predefinedTransactionToDuplicate = transaction
+                                    } label: {
+                                        Label("Duplicate to…", systemImage: "doc.on.doc")
+                                    }
+                                }
+                                .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                    Button {
+                                        predefinedTransactionToDuplicate = transaction
+                                    } label: {
+                                        Label("Duplicate", systemImage: "doc.on.doc")
+                                    }
+                                    .tint(.blue)
                                 }
                         }
                         .onDelete { offsets in

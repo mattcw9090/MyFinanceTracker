@@ -85,11 +85,11 @@ struct CashFlowTabView: View {
     }
 
     private var totalOwedToMe: Double {
-        owedToMeItems.reduce(0) { $0 + $1.amount }
+        owedToMeItems.filter { !$0.isSettled }.reduce(0) { $0 + $1.amount }
     }
 
     private var totalIOwe: Double {
-        iOweItems.reduce(0) { $0 + $1.amount }
+        iOweItems.filter { !$0.isSettled }.reduce(0) { $0 + $1.amount }
     }
 
     private var netCashFlow: Double {
@@ -197,7 +197,18 @@ struct CashFlowTabView: View {
                     }
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
-                    .swipeActions {
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                        Button {
+                            toggleSettled(item)
+                        } label: {
+                            Label(
+                                item.isSettled ? "Unmark" : "Mark Paid",
+                                systemImage: item.isSettled ? "arrow.uturn.backward.circle" : "checkmark.circle.fill"
+                            )
+                        }
+                        .tint(item.isSettled ? .gray : .green)
+                    }
+                    .swipeActions(edge: .trailing) {
                         Button(role: .destructive) { delete(item) } label: {
                             Label("Delete", systemImage: "trash")
                         }
@@ -215,6 +226,15 @@ struct CashFlowTabView: View {
 
     private func delete(_ item: CashFlowItem) {
         viewContext.delete(item)
+        saveContext()
+    }
+
+    private func toggleSettled(_ item: CashFlowItem) {
+        item.isSettled.toggle()
+        saveContext()
+    }
+
+    private func saveContext() {
         do {
             try viewContext.save()
         } catch {
