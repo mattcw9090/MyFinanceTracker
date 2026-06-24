@@ -71,7 +71,6 @@ struct EditQuickAddTransactionView: View {
                       message: Text(alertMessage),
                       dismissButton: .default(Text("OK")))
             }
-            .accentColor(.purple)
         }
         .navigationViewStyle(StackNavigationViewStyle())
     }

@@ -33,7 +33,12 @@ struct NetIncomeTabView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(UIColor.systemBackground).ignoresSafeArea()
+                LinearGradient(
+                    gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
                 VStack {
                     NetIncomeView()
                         .padding(.horizontal)
@@ -95,7 +100,6 @@ struct NetIncomeTabView: View {
                                 TransactionListView(day: day, transactions: transactionsForDay(day))
                                     .listStyle(PlainListStyle())
                             }
-                            .background(Color(.systemBackground))
                             .padding()
                             .tag(day)
                         }
@@ -153,7 +157,6 @@ struct NetIncomeTabView: View {
                     )
                 }
             }
-            .accentColor(.purple)
         }
     }
 

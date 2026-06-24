@@ -169,7 +169,6 @@ struct AddTransactionView: View {
                     }) {
                         Text("Cancel")
                             .fontWeight(.semibold)
-                            .foregroundColor(.purple)
                     }
                     .accessibilityIdentifier("cancelButton"),
                     trailing: Button(action: {
@@ -182,7 +181,7 @@ struct AddTransactionView: View {
                             .padding(.vertical, 10)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(isFormValid() ? Color.purple : Color.gray.opacity(0.5))
+                                    .fill(isFormValid() ? Color.accentColor : Color.gray.opacity(0.5))
                             )
                     }
                     .disabled(!isFormValid())

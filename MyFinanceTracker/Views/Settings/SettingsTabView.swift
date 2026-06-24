@@ -48,7 +48,7 @@ struct SettingsTabView: View {
                         if predefinedTransactions.isEmpty {
                             EmptyStateView(
                                 message: "No predefined transactions. Add some to get started.",
-                                systemImage: "tray"
+                                imageName: "tray"
                             )
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
@@ -93,7 +93,7 @@ struct SettingsTabView: View {
                         if quickAddTransactions.isEmpty {
                             EmptyStateView(
                                 message: "No quick add transactions. Add some to get started.",
-                                systemImage: "plus.circle"
+                                imageName: "plus.circle"
                             )
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
@@ -211,30 +211,12 @@ struct SettingsTabView: View {
                 Button(action: action) {
                     Image(systemName: "plus.circle.fill")
                         .imageScale(.large)
-                        .foregroundColor(.purple)
+                        .foregroundStyle(.tint)
                 }
                 .buttonStyle(BorderlessButtonStyle())
                 .accessibilityLabel("Add \(title)")
             }
             .padding(.vertical, 4)
-        }
-    }
-
-    // MARK: - Empty State View
-    struct EmptyStateView: View {
-        let message: String
-        let systemImage: String
-
-        var body: some View {
-            HStack {
-                Image(systemName: systemImage)
-                    .foregroundColor(.gray)
-                    .padding(.trailing, 8)
-                Text(message)
-                    .foregroundColor(.gray)
-                    .italic()
-            }
-            .padding(.vertical, 8)
         }
     }
 
@@ -324,7 +306,7 @@ struct SettingsTabView: View {
         private func formattedAmount(transaction: QuickAddTransaction) -> String {
             let amount = abs(transaction.amount)
             let prefix = transaction.isIncome ? "$" : "-$"
-            return "\(prefix)\(String(format: "%.2F", amount))"
+            return "\(prefix)\(String(format: "%.2f", amount))"
         }
     }
 

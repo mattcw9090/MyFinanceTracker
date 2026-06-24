@@ -65,7 +65,7 @@ struct AdjustNetIncomeView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.blue)
+                            .background(Color.accentColor)
                             .cornerRadius(8)
                             .shadow(radius: 2)
                     }
