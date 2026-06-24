@@ -11,7 +11,7 @@ struct AddTransactionView: View {
     @State private var descriptionText = ""
     @State private var amount = ""
 
-    let days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    let days = Weekday.allNames
 
     @EnvironmentObject var netIncomeManager: NetIncomeManager
 
@@ -93,17 +93,11 @@ struct AddTransactionView: View {
                                     .foregroundColor(.primary)
 
                                 TextField("Enter Amount", text: $amount)
-                                    .keyboardType(.decimalPad)
+                                    .decimalInput($amount)
                                     .padding(12)
                                     .background(Color(UIColor.secondarySystemBackground))
                                     .cornerRadius(8)
                                     .accessibilityIdentifier("amountField")
-                                    .onReceive(amount.publisher.collect()) { newValue in
-                                        let filtered = newValue.filter { "0123456789.".contains($0) }
-                                        if filtered != newValue {
-                                            amount = String(filtered.prefix(10))
-                                        }
-                                    }
                             }
                         }
                         .padding()

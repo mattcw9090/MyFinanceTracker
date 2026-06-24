@@ -10,16 +10,11 @@ struct NetIncomeTabView: View {
         var id: Int { hashValue }
     }
 
-    let days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    let days = Weekday.allNames
 
     @State private var showingAddIncome = false
     @State private var showingAddExpense = false
-    @State private var selectedDay: String = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "EEEE"
-        return formatter.string(from: Date())
-    }()
+    @State private var selectedDay: String = Weekday.today
     @State private var activeAlert: ActiveAlert?
     
     @FetchRequest(

@@ -149,12 +149,7 @@ struct TransactionRowView: View {
         saveContext()
     }
 
-    /// Saves the current state of the managed object context.
     private func saveContext() {
-        do {
-            try viewContext.save()
-        } catch {
-            print("Error saving context: \(error.localizedDescription)")
-        }
+        viewContext.saveOrLog()
     }
 }

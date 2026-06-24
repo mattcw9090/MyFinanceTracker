@@ -41,11 +41,6 @@ struct TransactionListView: View {
     private func deleteTransaction(_ transaction: Transaction) {
         netIncomeManager.adjustNetIncome(by: transaction.amount, isIncome: transaction.isIncome, isDeletion: true)
         viewContext.delete(transaction)
-
-        do {
-            try viewContext.save()
-        } catch {
-            print("Error deleting transaction: \(error.localizedDescription)")
-        }
+        viewContext.saveOrLog()
     }
 }

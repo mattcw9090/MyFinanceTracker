@@ -6,7 +6,7 @@ struct DuplicatePredefinedTransactionView: View {
 
     let source: PredefinedTransaction
 
-    private let daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    private let daysOfWeek = Weekday.allNames
 
     @State private var selectedDays: Set<String> = []
     @State private var showAlert = false

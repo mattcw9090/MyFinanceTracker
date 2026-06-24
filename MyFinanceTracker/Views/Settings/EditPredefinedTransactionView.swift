@@ -11,7 +11,7 @@ struct EditPredefinedTransactionView: View {
     @State private var selectedDay: String
     @State private var isIncome: Bool
 
-    let days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    let days = Weekday.allNames
 
     @State private var showAlert = false
     @State private var alertMessage = ""
@@ -41,14 +41,8 @@ struct EditPredefinedTransactionView: View {
                     }
                     Section(header: Text("Amount").font(.headline)) {
                         TextField("Enter amount", text: $amount)
-                            .keyboardType(.decimalPad)
+                            .decimalInput($amount)
                             .accessibilityIdentifier("EditPredefined_AmountTextField")
-                            .onReceive(amount.publisher.collect()) { newValue in
-                                let filtered = newValue.filter { "0123456789.".contains($0) }
-                                if filtered != newValue {
-                                    amount = String(filtered.prefix(10))
-                                }
-                            }
                     }
                     Section(header: Text("Day of the Week").font(.headline)) {
                         Picker("Select Day", selection: $selectedDay) {

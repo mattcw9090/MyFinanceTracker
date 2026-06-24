@@ -226,20 +226,12 @@ struct CashFlowTabView: View {
 
     private func delete(_ item: CashFlowItem) {
         viewContext.delete(item)
-        saveContext()
+        viewContext.saveOrLog()
     }
 
     private func toggleSettled(_ item: CashFlowItem) {
         item.isSettled.toggle()
-        saveContext()
-    }
-
-    private func saveContext() {
-        do {
-            try viewContext.save()
-        } catch {
-            print("Error saving context: \(error.localizedDescription)")
-        }
+        viewContext.saveOrLog()
     }
 }
 

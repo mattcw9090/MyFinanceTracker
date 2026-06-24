@@ -28,14 +28,8 @@ struct AddQuickAddTransactionView: View {
                     }
                     Section(header: Text("Amount").font(.headline)) {
                         TextField("Enter amount", text: $amount)
-                            .keyboardType(.decimalPad)
+                            .decimalInput($amount)
                             .accessibilityIdentifier("AddQuickAdd_AmountTextField")
-                            .onReceive(amount.publisher.collect()) { newValue in
-                                let filtered = newValue.filter { "0123456789.".contains($0) }
-                                if filtered != newValue {
-                                    amount = String(filtered.prefix(10))
-                                }
-                            }
                     }
                     Section(header: Text("Transaction Type").font(.headline)) {
                         Picker("Type", selection: $isIncome) {

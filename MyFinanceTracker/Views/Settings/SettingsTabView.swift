@@ -22,7 +22,7 @@ struct SettingsTabView: View {
     @State private var showingAddQuickAddTransaction = false
     @State private var quickAddTransactionToEdit: QuickAddTransaction?
 
-    let daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    let daysOfWeek = Weekday.allNames
 
     var body: some View {
         NavigationStack {
@@ -212,22 +212,14 @@ struct SettingsTabView: View {
     private func deletePredefinedTransaction(_ offsets: IndexSet, from transactionsForDay: [PredefinedTransaction]) {
         withAnimation {
             offsets.map { transactionsForDay[$0] }.forEach(viewContext.delete)
-            saveContext()
+            viewContext.saveOrLog()
         }
     }
 
     private func deleteQuickAddTransaction(offsets: IndexSet, from transactionsSubset: [QuickAddTransaction]) {
         withAnimation {
             offsets.map { transactionsSubset[$0] }.forEach(viewContext.delete)
-            saveContext()
-        }
-    }
-
-    private func saveContext() {
-        do {
-            try viewContext.save()
-        } catch {
-            print("Error saving context: \(error.localizedDescription)")
+            viewContext.saveOrLog()
         }
     }
 }

@@ -107,15 +107,9 @@ struct BulkAddCashFlowItemsView: View {
                     Image(systemName: "dollarsign.circle")
                         .foregroundColor(.secondary)
                     TextField("Enter amount", text: $amount)
-                        .keyboardType(.decimalPad)
+                        .decimalInput($amount)
                         .textFieldStyle(PlainTextFieldStyle())
                         .accessibilityIdentifier("BulkAdd_AmountField")
-                        .onChange(of: amount) { _, newValue in
-                            let filtered = newValue.filter { "0123456789.".contains($0) }
-                            if filtered != newValue {
-                                amount = String(filtered.prefix(10))
-                            }
-                        }
                 }
                 .padding()
                 .background(
