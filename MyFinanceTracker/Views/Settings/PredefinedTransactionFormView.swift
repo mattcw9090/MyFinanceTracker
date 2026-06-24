@@ -51,15 +51,7 @@ struct PredefinedTransactionFormView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                LinearGradient(
-                    gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-
-                Form {
+            Form {
                     Section(header: Text("Description").font(.headline)) {
                         TextField("Enter description", text: $descriptionText)
                             .accessibilityIdentifier("\(mode.identifierPrefix)_DescriptionTextField")
@@ -87,10 +79,9 @@ struct PredefinedTransactionFormView: View {
                         .pickerStyle(SegmentedPickerStyle())
                         .accessibilityIdentifier("\(mode.identifierPrefix)_TypePicker")
                     }
-                }
-                .scrollContentBackground(.hidden)
-                .background(Color.clear)
             }
+            .scrollContentBackground(.hidden)
+            .financeBackground()
             .navigationTitle(mode.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

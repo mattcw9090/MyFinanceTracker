@@ -64,6 +64,8 @@ struct EditTransactionView: View {
                     .accessibilityIdentifier("editTransactionTypePicker")
                 }
             }
+            .scrollContentBackground(.hidden)
+            .financeBackground()
             .navigationTitle("Edit Transaction")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

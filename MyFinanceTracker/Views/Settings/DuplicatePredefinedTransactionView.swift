@@ -36,6 +36,8 @@ struct DuplicatePredefinedTransactionView: View {
                     Text("Each selected day will get a copy of this transaction.")
                 }
             }
+            .scrollContentBackground(.hidden)
+            .financeBackground()
             .navigationTitle("Duplicate")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

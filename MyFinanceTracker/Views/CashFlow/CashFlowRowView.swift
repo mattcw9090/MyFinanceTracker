@@ -6,33 +6,33 @@ struct CashFlowRowView: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 10) {
-                if item.isSettled {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                        .imageScale(.large)
-                }
+            HStack(spacing: 12) {
+                Image(systemName: item.isSettled ? "checkmark" : (item.isOwedToMe ? "arrow.down.left" : "arrow.up.right"))
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(item.isSettled ? Color.secondary : amountColor)
+                    .frame(width: 38, height: 38)
+                    .background((item.isSettled ? Color.secondary : amountColor).opacity(0.1), in: Circle())
 
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(item.name ?? "Unnamed")
-                        .font(.headline)
+                        .font(.subheadline.weight(.semibold))
                         .strikethrough(item.isSettled)
                         .foregroundStyle(item.isSettled ? .secondary : .primary)
                         .accessibilityIdentifier("cashFlowName")
                     Text(item.isOwedToMe ? "Owed to Me" : "I Owe")
-                        .font(.subheadline)
+                        .font(.caption)
                         .foregroundColor(.secondary)
                         .accessibilityIdentifier("cashFlowType")
                 }
                 Spacer()
                 Text(signedAmount.formattedAsCurrency())
-                    .font(.headline)
+                    .font(.subheadline.weight(.bold))
                     .foregroundColor(amountColor)
                     .strikethrough(item.isSettled)
                     .monospacedDigit()
                     .accessibilityIdentifier("cashFlowAmount")
             }
-            .padding(.horizontal, 8)
+            .financeCard(padding: 14)
             .opacity(item.isSettled ? 0.55 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())
@@ -45,6 +45,6 @@ struct CashFlowRowView: View {
 
     private var amountColor: Color {
         if item.isSettled { return .secondary }
-        return item.isOwedToMe ? .green : .red
+        return item.isOwedToMe ? FinanceTheme.income : FinanceTheme.expense
     }
 }

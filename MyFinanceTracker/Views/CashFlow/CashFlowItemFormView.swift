@@ -52,41 +52,25 @@ struct CashFlowItemFormView: View {
     }
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-
-            ScrollView {
-                VStack(spacing: 30) {
-                    Text(mode.title)
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .padding(.top, 20)
-                        .foregroundColor(.primary)
-
+        ScrollView {
+                VStack(spacing: 18) {
                     CashFlowFormFields(name: $name, amount: $amount, isOwedToMe: $isOwedToMe)
                         .padding(.horizontal)
+                        .padding(.top, 12)
 
                     Button(action: commit) {
                         Text(mode.saveButtonTitle)
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(isFormValid ? Color.accentColor : Color.gray)
-                            .cornerRadius(10)
-                            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
                     }
+                    .buttonStyle(FinancePrimaryButtonStyle())
                     .disabled(!isFormValid)
+                    .opacity(isFormValid ? 1 : 0.45)
                     .padding(.horizontal)
                 }
                 .padding(.bottom, 50)
-            }
         }
+        .financeBackground()
+        .navigationTitle(mode.title)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }

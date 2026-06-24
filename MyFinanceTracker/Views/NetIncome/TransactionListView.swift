@@ -9,20 +9,25 @@ struct TransactionListView: View {
     @EnvironmentObject var netIncomeManager: NetIncomeManager
 
     var body: some View {
-        VStack {
+        Group {
             if transactions.isEmpty {
                 ScrollView {
-                    VStack(spacing: 0) {
-                        Text("No transactions for \(day).")
-                            .foregroundColor(.gray)
-                            .italic()
+                    VStack(spacing: 12) {
+                        Image(systemName: "calendar.badge.checkmark")
+                            .font(.system(size: 30, weight: .light))
+                            .foregroundStyle(FinanceTheme.accent)
+                        Text("Nothing planned")
+                            .font(.headline)
+                        Text("Add income or an expense for \(day).")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 25)
+                    .frame(maxWidth: .infinity)
+                    .financeCard(padding: 28)
                 }
             } else {
                 ScrollView {
-                    VStack(spacing: 0) {
+                    LazyVStack(spacing: 10) {
                         ForEach(transactions, id: \.id) { transaction in
                             NavigationLink(destination: EditTransactionView(transaction: transaction)
                                             .environmentObject(netIncomeManager)) {
@@ -33,7 +38,7 @@ struct TransactionListView: View {
                             .buttonStyle(PlainButtonStyle())
                         }
                     }
-                    .padding(.horizontal, 15)
+                    .padding(.bottom, 24)
                 }
             }
         }

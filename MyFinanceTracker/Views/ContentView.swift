@@ -5,22 +5,22 @@ struct ContentView: View {
         TabView {
             NetIncomeTabView()
                 .tabItem {
-                    Image(systemName: "dollarsign.circle")
+                    Image(systemName: "chart.pie.fill")
                     Text("Net Income")
                 }
 
             CashFlowTabView()
                 .tabItem {
-                    Image(systemName: "banknote")
+                    Image(systemName: "arrow.left.arrow.right.circle.fill")
                     Text("Cash Flow")
                 }
 
             SettingsTabView()
                 .tabItem {
-                    Image(systemName: "gearshape")
+                    Image(systemName: "slider.horizontal.3")
                     Text("Settings")
                 }
         }
-        .tint(.purple)
+        .tint(FinanceTheme.accent)
     }
 }

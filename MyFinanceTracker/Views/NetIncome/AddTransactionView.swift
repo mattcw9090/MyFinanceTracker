@@ -32,158 +32,96 @@ struct AddTransactionView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                LinearGradient(
-                    gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: 25) {
-                        // Day Picker Card
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Day of the Week")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-
-                            Picker("Select Day", selection: $selectedDay) {
-                                ForEach(days, id: \.self) { day in
-                                    Text(day)
-                                }
+            ScrollView {
+                VStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        FinanceSectionLabel(title: "When", detail: selectedDay)
+                        Picker("Select Day", selection: $selectedDay) {
+                            ForEach(days, id: \.self) { day in
+                                Text(day)
                             }
-                            .pickerStyle(WheelPickerStyle())
-                            .frame(height: 150)
-                            .accessibilityIdentifier("AddTransaction_DayPicker")
                         }
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color(UIColor.systemBackground))
-                                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
-                        )
-                        .padding(.horizontal)
+                        .pickerStyle(.wheel)
+                        .frame(height: 128)
+                        .accessibilityIdentifier("AddTransaction_DayPicker")
+                    }
+                    .financeCard(padding: 18)
 
-                        // Manual Entry Card
-                        VStack(alignment: .leading, spacing: 18) {
-                            // Description Field
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("DESCRIPTION")
+                    VStack(alignment: .leading, spacing: 16) {
+                        FinanceSectionLabel(title: isIncome ? "Income details" : "Expense details")
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Description").font(.subheadline.weight(.semibold))
+                            TextField(isIncome ? "e.g. Pay" : "e.g. Groceries", text: $descriptionText)
+                                .financeField()
+                                .textInputAutocapitalization(.sentences)
+                                .accessibilityIdentifier("descriptionField")
+                        }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Amount").font(.subheadline.weight(.semibold))
+                            HStack(spacing: 10) {
+                                Text("$")
                                     .font(.headline)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.primary)
-
-                                TextField("Enter Description", text: $descriptionText)
-                                    .padding(12)
-                                    .background(Color(UIColor.secondarySystemBackground))
-                                    .cornerRadius(8)
-                                    .disableAutocorrection(true)
-                                    .accessibilityIdentifier("descriptionField")
-                            }
-
-                            // Amount Field
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("AMOUNT")
-                                    .font(.headline)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.primary)
-
-                                TextField("Enter Amount", text: $amount)
+                                    .foregroundStyle(.secondary)
+                                TextField("0.00", text: $amount)
                                     .decimalInput($amount)
-                                    .padding(12)
-                                    .background(Color(UIColor.secondarySystemBackground))
-                                    .cornerRadius(8)
                                     .accessibilityIdentifier("amountField")
                             }
+                            .financeField()
                         }
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color(UIColor.systemBackground))
-                                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
-                        )
-                        .padding(.horizontal)
+                    }
+                    .financeCard(padding: 18)
 
-                        // Quick Add Card
-                        if !quickAddTransactions.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Quick Add")
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-
-                                VStack(spacing: 12) {
-                                    ForEach(quickAddTransactions, id: \.id) { transaction in
-                                        Button(action: {
-                                            applyQuickAddTransaction(transaction)
-                                        }) {
-                                            VStack(alignment: .leading, spacing: 6) {
-                                                Text(transaction.desc ?? "")
-                                                    .font(.subheadline)
-                                                    .fontWeight(.semibold)
-                                                    .foregroundColor(.primary)
-                                                Text(transaction.amount.formattedAsCurrency())
-                                                    .font(.caption)
-                                                    .foregroundColor(transaction.isIncome ? .green : .red)
-                                            }
-                                            .padding()
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: 12)
-                                                    .fill(transaction.isIncome ? Color.green.opacity(0.15) : Color.red.opacity(0.15))
-                                            )
-                                            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 3)
+                    if !quickAddTransactions.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            FinanceSectionLabel(title: "Quick add", detail: "Tap to save")
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                                ForEach(quickAddTransactions, id: \.id) { transaction in
+                                    Button { applyQuickAddTransaction(transaction) } label: {
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            Image(systemName: "bolt.fill")
+                                                .foregroundStyle(FinanceTheme.accent)
+                                            Text(transaction.desc ?? "")
+                                                .font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(.primary)
+                                                .lineLimit(1)
+                                            Text(transaction.amount.formattedAsCurrency())
+                                                .font(.caption.weight(.medium))
+                                                .foregroundStyle(isIncome ? FinanceTheme.income : FinanceTheme.expense)
                                         }
-                                        .buttonStyle(PlainButtonStyle())
-                                        .accessibilityIdentifier("quickAdd_\(transaction.desc ?? "no_desc")")
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .financeCard(padding: 14)
                                     }
+                                    .buttonStyle(.plain)
+                                    .accessibilityIdentifier("quickAdd_\(transaction.desc ?? "no_desc")")
                                 }
-                                .padding(.horizontal)
                             }
-                            .padding()
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color(UIColor.systemBackground))
-                                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
-                            )
-                            .padding(.horizontal)
                         }
+                    }
 
-                        Spacer(minLength: 30)
+                    Button(action: addTransaction) {
+                        Text(isIncome ? "Add Income" : "Add Expense")
                     }
-                    .padding(.vertical)
+                    .buttonStyle(FinancePrimaryButtonStyle())
+                    .disabled(!isFormValid())
+                    .opacity(isFormValid() ? 1 : 0.45)
+                    .accessibilityIdentifier("saveButton")
                 }
-                .navigationTitle(isIncome ? "Add Income" : "Add Expense")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("Cancel") { dismiss() }
-                            .fontWeight(.semibold)
-                            .accessibilityIdentifier("cancelButton")
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            addTransaction()
-                        } label: {
-                            Text("Save")
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(isFormValid() ? Color.accentColor : Color.gray.opacity(0.5))
-                                )
-                        }
-                        .disabled(!isFormValid())
-                        .accessibilityIdentifier("saveButton")
-                    }
+                .padding(16)
+                .padding(.bottom, 24)
+            }
+            .financeBackground()
+            .navigationTitle(isIncome ? "Add Income" : "Add Expense")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .accessibilityIdentifier("cancelButton")
                 }
-                .alert(isPresented: $showAlert) {
-                    Alert(title: Text("Error"),
-                          message: Text(alertMessage),
-                          dismissButton: .default(Text("OK")))
-                }
+            }
+            .alert(isPresented: $showAlert) {
+                Alert(title: Text("Error"), message: Text(alertMessage), dismissButton: .default(Text("OK")))
             }
         }
     }

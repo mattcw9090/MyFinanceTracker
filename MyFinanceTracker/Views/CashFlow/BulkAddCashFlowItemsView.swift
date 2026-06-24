@@ -27,45 +27,29 @@ struct BulkAddCashFlowItemsView: View {
     }
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-
-            ScrollView {
+        ScrollView {
                 VStack(spacing: 24) {
-                    Text("Bulk Add Cash Flow")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .padding(.top, 20)
-                        .foregroundColor(.primary)
-
                     sharedDetailsCard
                         .padding(.horizontal)
+                        .padding(.top, 12)
 
                     namesCard
                         .padding(.horizontal)
 
                     Button(action: saveAll) {
                         Text(saveButtonTitle)
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(isFormValid ? Color.accentColor : Color.gray)
-                            .cornerRadius(10)
-                            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
                     }
+                    .buttonStyle(FinancePrimaryButtonStyle())
                     .disabled(!isFormValid)
+                    .opacity(isFormValid ? 1 : 0.45)
                     .padding(.horizontal)
                     .accessibilityIdentifier("BulkAdd_SaveButton")
                 }
                 .padding(.bottom, 50)
-            }
         }
+        .financeBackground()
+        .navigationTitle("Add Multiple")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }
@@ -98,7 +82,7 @@ struct BulkAddCashFlowItemsView: View {
                     Label("I Owe", systemImage: "arrow.up.circle.fill").tag(false)
                 }
                 .pickerStyle(.segmented)
-                .tint(.accentColor)
+                .tint(FinanceTheme.accent)
                 .accessibilityIdentifier("BulkAdd_TypePicker")
             }
 
@@ -114,19 +98,10 @@ struct BulkAddCashFlowItemsView: View {
                         .textFieldStyle(PlainTextFieldStyle())
                         .accessibilityIdentifier("BulkAdd_AmountField")
                 }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color(UIColor.secondarySystemBackground))
-                )
+                .financeField()
             }
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(UIColor.systemBackground))
-                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 3)
-        )
+        .financeCard(padding: 18)
     }
 
     private var namesCard: some View {
@@ -158,25 +133,16 @@ struct BulkAddCashFlowItemsView: View {
                             removeName(at: index)
                         } label: {
                             Image(systemName: "minus.circle.fill")
-                                .foregroundColor(.red)
+                                .foregroundStyle(FinanceTheme.expense)
                         }
                         .buttonStyle(BorderlessButtonStyle())
                         .accessibilityIdentifier("BulkAdd_RemoveNameButton_\(index)")
                     }
                 }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color(UIColor.secondarySystemBackground))
-                )
+                .financeField()
             }
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(UIColor.systemBackground))
-                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 3)
-        )
+        .financeCard(padding: 18)
     }
 
     private func addName() {

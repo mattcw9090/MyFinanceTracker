@@ -17,23 +17,32 @@ struct SettingsTabView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                LinearGradient(
-                    gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-
-                List {
+            List {
+                    Section {
+                        HStack(spacing: 14) {
+                            Image(systemName: "wand.and.stars")
+                                .font(.title3)
+                                .foregroundStyle(FinanceTheme.accent)
+                                .frame(width: 42, height: 42)
+                                .background(FinanceTheme.accent.opacity(0.1), in: Circle())
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Make each week effortless")
+                                    .font(.headline)
+                                Text("Build reusable transactions and quick shortcuts.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 5)
+                    }
                     predefinedGroup
                     quickAddGroup
-                }
-                .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
             }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .financeBackground()
             .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     EditButton()
@@ -55,7 +64,8 @@ struct SettingsTabView: View {
                         .accessibilityIdentifier("AddQuickAdd_SectionHeader")
                     } label: {
                         Image(systemName: "plus.circle.fill")
-                            .imageScale(.large)
+                            .font(.title2)
+                            .foregroundStyle(FinanceTheme.accent)
                     }
                     .accessibilityIdentifier("Settings_AddMenu")
                 }
@@ -151,7 +161,7 @@ struct SettingsTabView: View {
                 let expense = quickAddTransactions.filter { !$0.isIncome }
 
                 if !income.isEmpty {
-                    SectionSubHeader(text: "Income", tint: .green)
+                    SectionSubHeader(text: "Income", tint: FinanceTheme.income)
 
                     ForEach(income, id: \.id) { transaction in
                         QuickAddTransactionRow(transaction: transaction)
@@ -166,7 +176,7 @@ struct SettingsTabView: View {
                 }
 
                 if !expense.isEmpty {
-                    SectionSubHeader(text: "Expense", tint: .red)
+                    SectionSubHeader(text: "Expense", tint: FinanceTheme.expense)
 
                     ForEach(expense, id: \.id) { transaction in
                         QuickAddTransactionRow(transaction: transaction)
@@ -255,7 +265,7 @@ private struct SettingsTransactionRow: View {
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: isIncome ? "arrow.up.circle.fill" : "arrow.down.circle.fill")
-                .foregroundColor(isIncome ? .green : .red)
+                .foregroundStyle(isIncome ? FinanceTheme.income : FinanceTheme.expense)
                 .imageScale(.large)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -271,7 +281,7 @@ private struct SettingsTransactionRow: View {
 
             Text(signedAmount.formattedAsCurrency())
                 .font(.body.weight(.semibold))
-                .foregroundColor(isIncome ? .green : .red)
+                .foregroundStyle(isIncome ? FinanceTheme.income : FinanceTheme.expense)
                 .monospacedDigit()
         }
         .padding(.vertical, 4)

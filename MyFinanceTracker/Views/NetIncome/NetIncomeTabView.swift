@@ -26,33 +26,17 @@ struct NetIncomeTabView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                LinearGradient(
-                    gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-                VStack {
+            VStack(spacing: 0) {
                     NetIncomeBalanceCard()
-                        .padding(.horizontal)
-                        .padding(.top)
-                        .padding(.bottom, 16)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                        .padding(.bottom, 14)
 
-                    // Add Income/Expense Buttons
-                    HStack(spacing: 20) {
+                    HStack(spacing: 12) {
                         Button(action: { showingAddIncome.toggle() }) {
-                            HStack {
-                                Image(systemName: "plus.circle.fill")
-                                Text("Add Income")
-                                    .fontWeight(.semibold)
-                            }
-                            .padding()
-                            .foregroundColor(.white)
-                            .background(Color.green)
-                            .cornerRadius(10)
-                            .shadow(radius: 2)
+                            Label("Income", systemImage: "plus")
                         }
+                        .buttonStyle(FinanceActionButtonStyle(tint: FinanceTheme.income))
                         .accessibilityIdentifier("addIncomeButton")
                         .sheet(isPresented: $showingAddIncome) {
                             AddTransactionView(isIncome: true, selectedDay: $selectedDay)
@@ -60,64 +44,53 @@ struct NetIncomeTabView: View {
                         }
 
                         Button(action: { showingAddExpense.toggle() }) {
-                            HStack {
-                                Image(systemName: "minus.circle.fill")
-                                Text("Add Expense")
-                                    .fontWeight(.semibold)
-                            }
-                            .padding()
-                            .foregroundColor(.white)
-                            .background(Color.red)
-                            .cornerRadius(10)
-                            .shadow(radius: 2)
+                            Label("Expense", systemImage: "minus")
                         }
+                        .buttonStyle(FinanceActionButtonStyle(tint: FinanceTheme.expense))
                         .accessibilityIdentifier("addExpenseButton")
                         .sheet(isPresented: $showingAddExpense) {
                             AddTransactionView(isIncome: false, selectedDay: $selectedDay)
                                 .environmentObject(netIncomeManager)
                         }
                     }
-                    .padding(.horizontal)
-                    .padding(.bottom, 10)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 14)
 
-                    // Daily Transactions TabView
+                    daySelector
+
                     TabView(selection: $selectedDay) {
                         ForEach(days, id: \.self) { day in
-                            VStack(alignment: .leading) {
-                                Text(day)
-                                    .font(.largeTitle)
-                                    .bold()
-                                    .padding(.bottom, 10)
+                            VStack(alignment: .leading, spacing: 12) {
+                                FinanceSectionLabel(
+                                    title: day,
+                                    detail: transactionSummary(for: day)
+                                )
                                     .accessibilityIdentifier("selectedDay")
 
                                 TransactionListView(day: day, transactions: transactionsForDay(day))
-                                    .listStyle(PlainListStyle())
                             }
-                            .padding()
+                            .padding(.horizontal, 16)
+                            .padding(.top, 16)
                             .tag(day)
                         }
-
                     }
-                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
-                    .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .automatic))
-                }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
             }
-            .navigationTitle("My Finance")
-            .navigationBarTitleDisplayMode(.inline)
+            .financeBackground()
+            .navigationTitle("My Week")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     HStack(spacing: 20) {
                         Button { activeAlert = .reset } label: {
                             Image(systemName: "arrow.counterclockwise")
-                                .imageScale(.large)
-                                .foregroundColor(.red)
+                                .foregroundStyle(FinanceTheme.expense)
                         }
                         .accessibilityIdentifier("resetButton")
 
                         Button { activeAlert = .initializeWeek } label: {
                             Image(systemName: "calendar.badge.plus")
-                                .imageScale(.large)
-                                .foregroundColor(.blue)
+                                .foregroundStyle(FinanceTheme.accent)
                         }
                         .accessibilityIdentifier("initializeWeekButton")
                     }
@@ -158,6 +131,44 @@ struct NetIncomeTabView: View {
 
     private func transactionsForDay(_ day: String) -> [Transaction] {
         transactions.filter { $0.dayOfWeek == day }
+    }
+
+    private var daySelector: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(days, id: \.self) { day in
+                        Button {
+                            withAnimation(.snappy) { selectedDay = day }
+                        } label: {
+                            VStack(spacing: 4) {
+                                Text(String(day.prefix(1)))
+                                    .font(.caption.weight(.semibold))
+                                Text(day == Weekday.today ? "Today" : String(day.prefix(3)))
+                                    .font(.caption2.weight(.medium))
+                            }
+                            .foregroundStyle(selectedDay == day ? .white : .secondary)
+                            .frame(width: 54, height: 48)
+                            .background(
+                                selectedDay == day ? FinanceTheme.accent : FinanceTheme.surface,
+                                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .id(day)
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+            .onChange(of: selectedDay) { _, day in
+                withAnimation(.snappy) { proxy.scrollTo(day, anchor: .center) }
+            }
+        }
+    }
+
+    private func transactionSummary(for day: String) -> String {
+        let count = transactionsForDay(day).count
+        return count == 1 ? "1 planned item" : "\(count) planned items"
     }
 
     private func resetAll() {

@@ -26,19 +26,11 @@ struct CashFlowTabView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                LinearGradient(
-                    gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-
-                VStack(spacing: 0) {
+            VStack(spacing: 0) {
                     summaryCard
-                        .padding(.horizontal)
+                        .padding(.horizontal, 16)
                         .padding(.top, 8)
-                        .padding(.bottom, 4)
+                        .padding(.bottom, 10)
 
                     List {
                         cashFlowSection(
@@ -58,10 +50,10 @@ struct CashFlowTabView: View {
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
                     .accessibilityIdentifier("cashFlowListView")
-                }
             }
+            .financeBackground()
             .navigationTitle("Cash Flow")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     addMenu
@@ -96,21 +88,38 @@ struct CashFlowTabView: View {
     // MARK: - Subviews
 
     private var summaryCard: some View {
-        HStack(spacing: 10) {
-            summaryPill(label: "Owed to Me", amount: totalOwedToMe, tint: .green)
-            summaryPill(label: "I Owe", amount: totalIOwe, tint: .red)
-            summaryPill(label: "Net", amount: netCashFlow, tint: netCashFlow >= 0 ? .green : .red)
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("NET POSITION")
+                    .font(.caption.weight(.bold))
+                    .tracking(0.8)
+                    .foregroundStyle(.secondary)
+                Text(netCashFlow.formattedAsCurrency())
+                    .font(.system(.title, design: .rounded, weight: .bold))
+                    .foregroundStyle(netCashFlow >= 0 ? FinanceTheme.income : FinanceTheme.expense)
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+            }
+
+            Divider()
+
+            HStack(spacing: 0) {
+                summaryMetric(label: "Coming in", amount: totalOwedToMe, tint: FinanceTheme.income)
+                Divider().frame(height: 38)
+                summaryMetric(label: "Going out", amount: totalIOwe, tint: FinanceTheme.expense)
+            }
         }
+        .financeCard(padding: 20)
     }
 
-    private func summaryPill(label: String, amount: Double, tint: Color) -> some View {
+    private func summaryMetric(label: String, amount: Double, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(label.uppercased())
-                .font(.caption2.weight(.semibold))
-                .foregroundColor(.secondary)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
             Text(amount.formattedAsCurrency())
-                .font(.subheadline.weight(.bold))
-                .foregroundColor(tint)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(tint)
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
@@ -119,8 +128,6 @@ struct CashFlowTabView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private var addMenu: some View {
@@ -138,7 +145,7 @@ struct CashFlowTabView: View {
         } label: {
             Image(systemName: "plus.circle.fill")
                 .font(.title2)
-                .foregroundColor(.accentColor)
+                .foregroundStyle(FinanceTheme.accent)
         }
     }
 
@@ -175,9 +182,8 @@ struct CashFlowTabView: View {
     private func cashFlowSection(title: String, items: [CashFlowItem], emptyMessage: String, emptyImage: String) -> some View {
         Section(header:
             Text(title)
-                .font(.title2)
-                .bold()
-                .foregroundColor(.primary)
+                .font(.headline)
+                .foregroundStyle(.primary)
         ) {
             if items.isEmpty {
                 EmptyStateView(message: emptyMessage, imageName: emptyImage)
@@ -199,7 +205,7 @@ struct CashFlowTabView: View {
                                 systemImage: item.isSettled ? "arrow.uturn.backward.circle" : "checkmark.circle.fill"
                             )
                         }
-                        .tint(item.isSettled ? .gray : .green)
+                        .tint(item.isSettled ? .gray : FinanceTheme.income)
                     }
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) { delete(item) } label: {
@@ -210,7 +216,7 @@ struct CashFlowTabView: View {
                         } label: {
                             Label("Edit", systemImage: "pencil")
                         }
-                        .tint(.orange)
+                        .tint(FinanceTheme.amber)
                     }
                 }
             }
@@ -235,11 +241,11 @@ struct EmptyStateView: View {
     var body: some View {
         VStack(spacing: 10) {
             Image(systemName: imageName)
-                .font(.largeTitle)
-                .foregroundColor(.secondary)
+                .font(.system(size: 28, weight: .light))
+                .foregroundStyle(FinanceTheme.accent)
             Text(message)
-                .foregroundColor(.secondary)
-                .italic()
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
         .padding()
         .frame(maxWidth: .infinity)

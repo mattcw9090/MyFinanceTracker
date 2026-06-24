@@ -13,48 +13,50 @@ struct TransactionRowView: View {
     var onDelete: () -> Void
 
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
+            Image(systemName: transaction.isIncome ? "arrow.down.left" : "arrow.up.right")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(transaction.isIncome ? FinanceTheme.income : FinanceTheme.expense)
+                .frame(width: 38, height: 38)
+                .background(
+                    (transaction.isIncome ? FinanceTheme.income : FinanceTheme.expense).opacity(0.11),
+                    in: Circle()
+                )
             VStack(alignment: .leading, spacing: 4) {
                 Text(transaction.desc ?? "No Description")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .accessibilityIdentifier("transactionDescription")
                 Text(transaction.isIncome ? "Income" : "Expense")
-                    .font(.system(size: 14))
-                    .foregroundColor(.gray)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                     .accessibilityIdentifier("transactionType")
             }
             Spacer()
             Text(signedAmount.formattedAsCurrency())
-                .foregroundColor(transaction.isIncome ? .green : .red)
-                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(transaction.isIncome ? FinanceTheme.income : FinanceTheme.expense)
+                .font(.subheadline.weight(.bold))
                 .monospacedDigit()
                 .accessibilityIdentifier("transactionAmount")
 
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 Button(action: markAsComplete) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.blue)
-                        .imageScale(.large)
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(FinanceTheme.income)
+                        .frame(width: 32, height: 32)
+                        .background(FinanceTheme.income.opacity(0.1), in: Circle())
                 }
                 .accessibilityIdentifier("markCompleteButton")
 
                 Button(action: onDelete) {
-                    Image(systemName: "trash.circle.fill")
-                        .foregroundColor(.red)
-                        .imageScale(.large)
+                    Image(systemName: "trash")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, height: 32)
                 }
                 .accessibilityIdentifier("deleteButton")
             }
             .buttonStyle(BorderlessButtonStyle())
         }
-        .padding(.horizontal, 15)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(UIColor.secondarySystemBackground))
-                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 3)
-        )
-        .padding(.vertical, 10)
+        .financeCard(padding: 14)
         .alert(isPresented: $showAddToCashFlowConfirmation) {
             Alert(
                 title: Text("Add to Cash Flow"),

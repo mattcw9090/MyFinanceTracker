@@ -12,81 +12,61 @@ struct AdjustNetIncomeView: View {
     @FocusState private var isAmountFieldFocused: Bool
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground), Color(UIColor.systemBackground)]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+        VStack(spacing: 20) {
+                VStack(spacing: 8) {
+                    Image(systemName: "slider.horizontal.2.square")
+                        .font(.system(size: 32, weight: .medium))
+                        .foregroundStyle(FinanceTheme.accent)
+                    Text("Fine-tune your balance")
+                        .font(.title3.weight(.semibold))
+                    Text("Use this for corrections that aren’t transactions.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.top, 24)
 
-            VStack(spacing: 20) {
-                Text("Adjust Net Income")
-                    .font(.largeTitle)
-                    .bold()
-                    .padding(.top, 40)
-                    .foregroundColor(.primary)
-
-                // Operation Picker
                 Picker("Operation", selection: $isAddition) {
                     Text("Add").tag(true)
                     Text("Subtract").tag(false)
                 }
                 .pickerStyle(SegmentedPickerStyle())
-                .padding(.horizontal)
-                .tint(.accentColor)
+                .tint(FinanceTheme.accent)
                 .accessibilityIdentifier("operationPicker")
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("AMOUNT")
+                    Text("Amount")
                         .font(.headline)
-                        .foregroundColor(.primary)
 
                     TextField("Enter Amount", text: $amount)
                         .keyboardType(.decimalPad)
-                        .padding()
-                        .background(Color(UIColor.secondarySystemBackground))
-                        .cornerRadius(8)
+                        .financeField()
                         .accessibilityIdentifier("adjustAmountField")
                         .focused($isAmountFieldFocused)
                 }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color(UIColor.systemBackground))
-                        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 3)
-                )
-                .padding(.horizontal)
+                .financeCard(padding: 18)
 
-                HStack(spacing: 20) {
+                VStack(spacing: 10) {
                     Button(action: { adjustNetIncome() }) {
                         Text("Confirm")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.accentColor)
-                            .cornerRadius(8)
-                            .shadow(radius: 2)
                     }
+                    .buttonStyle(FinancePrimaryButtonStyle())
                     .accessibilityIdentifier("confirmButton")
 
                     Button(action: { dismiss() }) {
                         Text("Cancel")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.gray)
-                            .cornerRadius(8)
-                            .shadow(radius: 2)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .accessibilityIdentifier("adjustCancelButton")
                 }
-                .padding(.horizontal)
-
                 Spacer()
             }
+            .padding(.horizontal, 16)
+            .financeBackground()
+            .navigationTitle("Adjust Balance")
+            .navigationBarTitleDisplayMode(.inline)
             .alert(isPresented: $showAlert) {
                 Alert(title: Text("Invalid Input"),
                       message: Text(alertMessage),
@@ -95,7 +75,6 @@ struct AdjustNetIncomeView: View {
             .onAppear {
                 isAmountFieldFocused = true
             }
-        }
     }
 
     private func adjustNetIncome() {
