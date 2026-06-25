@@ -14,6 +14,7 @@ struct NetIncomeTabView: View {
 
     @State private var showingAddIncome = false
     @State private var showingAddExpense = false
+    @State private var showingImportSessions = false
     @State private var selectedDay: String = Weekday.today
     @State private var activeAlert: ActiveAlert?
 
@@ -95,6 +96,18 @@ struct NetIncomeTabView: View {
                         .accessibilityIdentifier("initializeWeekButton")
                     }
                 }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showingImportSessions = true } label: {
+                        Image(systemName: "square.and.arrow.down")
+                            .foregroundStyle(FinanceTheme.accent)
+                    }
+                    .accessibilityIdentifier("importSessionsButton")
+                }
+            }
+            .sheet(isPresented: $showingImportSessions) {
+                ImportSessionsView()
+                    .environmentObject(netIncomeManager)
             }
             .alert(item: $activeAlert) { alertType in
                 switch alertType {
