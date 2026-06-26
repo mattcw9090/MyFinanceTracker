@@ -6,8 +6,8 @@ struct ImportSessionsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var netIncomeManager: NetIncomeManager
 
-    @State private var jsonText = ""
     @State private var parsedSessions: [ImportedSession] = []
+    @State private var bridgeInfo: String?
     @State private var errorMessage: String?
     @State private var showError = false
     @State private var showSuccess = false
@@ -16,44 +16,17 @@ struct ImportSessionsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        FinanceSectionLabel(
-                            title: "Session JSON",
-                            detail: parsedSessions.isEmpty ? "Paste array" : importSummary
+                    coachPlannerCard
+
+                    if parsedSessions.isEmpty {
+                        EmptyStateView(
+                            message: "Open CoachPlanner and tap the money icon to share your sessions, then load them here.",
+                            imageName: "tray.and.arrow.down"
                         )
-
-                        Text("Paste sessions with dayOfWeek, sessionFee, and sessionName. Each item will become an income transaction for that day.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        TextEditor(text: $jsonText)
-                            .font(.callout.monospaced())
-                            .frame(minHeight: 260)
-                            .padding(10)
-                            .background(FinanceTheme.field, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(FinanceTheme.border, lineWidth: 1)
-                            }
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-                            .accessibilityIdentifier("ImportSessions_JSONTextEditor")
-                    }
-                    .financeCard(padding: 18)
-
-                    if !parsedSessions.isEmpty {
+                        .padding(.top, 8)
+                    } else {
                         previewCard
-                    }
 
-                    Button(action: previewSessions) {
-                        Text("Preview Sessions")
-                    }
-                    .buttonStyle(FinancePrimaryButtonStyle())
-                    .disabled(jsonText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .opacity(jsonText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
-                    .accessibilityIdentifier("ImportSessions_PreviewButton")
-
-                    if !parsedSessions.isEmpty {
                         Button(action: importSessions) {
                             Text("Import \(parsedSessions.count) Sessions")
                         }
@@ -73,8 +46,11 @@ struct ImportSessionsView: View {
                         .accessibilityIdentifier("ImportSessions_CancelButton")
                 }
             }
-            .onChange(of: jsonText) {
-                parsedSessions = []
+            .task {
+                // Silently pre-fill if CoachPlanner has already shared a snapshot.
+                if parsedSessions.isEmpty {
+                    loadFromCoachPlanner(showErrors: false)
+                }
             }
             .alert("Import Problem", isPresented: $showError) {
                 Button("OK", role: .cancel) { }
@@ -87,6 +63,26 @@ struct ImportSessionsView: View {
                 Text("Added \(parsedSessions.count) income transactions to your week.")
             }
         }
+    }
+
+    private var coachPlannerCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            FinanceSectionLabel(
+                title: "From CoachPlanner",
+                detail: bridgeInfo ?? "Shared on this device"
+            )
+
+            Text("Pull the latest sessions CoachPlanner shared via the App Group. Tapping the money icon in CoachPlanner refreshes this snapshot.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Button(action: { loadFromCoachPlanner(showErrors: true) }) {
+                Label("Load from CoachPlanner", systemImage: "square.and.arrow.down")
+            }
+            .buttonStyle(FinancePrimaryButtonStyle())
+            .accessibilityIdentifier("ImportSessions_LoadFromCoachPlannerButton")
+        }
+        .financeCard(padding: 18)
     }
 
     private var previewCard: some View {
@@ -125,21 +121,23 @@ struct ImportSessionsView: View {
         return "\(parsedSessions.count) sessions • \(total.formattedAsCurrency())"
     }
 
-    private func previewSessions() {
+    private func loadFromCoachPlanner(showErrors: Bool) {
         do {
-            parsedSessions = try SessionImportParser.parse(jsonText)
-        } catch let importError as SessionImportError {
-            errorMessage = importError.localizedDescription
-            showError = true
+            let result = try CoachPlannerBridge.readSessions()
+            parsedSessions = result.sessions
+            let when = result.envelope.exportedAt.formatted(date: .abbreviated, time: .shortened)
+            bridgeInfo = "\(result.envelope.source) • \(when)"
         } catch {
-            errorMessage = "Failed to preview sessions: \(error.localizedDescription)"
+            guard showErrors else { return }
+            errorMessage = (error as? LocalizedError)?.errorDescription
+                ?? "Failed to load from CoachPlanner: \(error.localizedDescription)"
             showError = true
         }
     }
 
     private func importSessions() {
         do {
-            for session in sessions {
+            for session in parsedSessions {
                 let transaction = Transaction(
                     desc: session.sessionName,
                     amount: session.sessionFee,
@@ -157,9 +155,5 @@ struct ImportSessionsView: View {
             errorMessage = "Failed to import sessions: \(error.localizedDescription)"
             showError = true
         }
-    }
-
-    private var sessions: [ImportedSession] {
-        parsedSessions
     }
 }

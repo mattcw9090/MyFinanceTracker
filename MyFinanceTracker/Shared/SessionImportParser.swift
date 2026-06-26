@@ -8,21 +8,12 @@ struct ImportedSession: Identifiable, Equatable {
 }
 
 enum SessionImportError: LocalizedError, Equatable {
-    case emptyInput
-    case invalidJSON
-    case noSessions
     case invalidDay(String)
     case invalidFee(String)
     case emptySessionName
 
     var errorDescription: String? {
         switch self {
-        case .emptyInput:
-            return "Paste a JSON array of sessions before importing."
-        case .invalidJSON:
-            return "That JSON could not be read. Check that it is a valid array of session objects."
-        case .noSessions:
-            return "No sessions were found in the JSON."
         case .invalidDay(let day):
             return "\"\(day)\" is not a valid day. Use Monday through Sunday."
         case .invalidFee(let sessionName):
@@ -34,50 +25,26 @@ enum SessionImportError: LocalizedError, Equatable {
 }
 
 enum SessionImportParser {
-    private struct RawSession: Decodable {
-        let dayOfWeek: String
-        let sessionFee: Double
-        let sessionName: String
-    }
-
-    static func parse(_ input: String) throws -> [ImportedSession] {
-        let trimmedInput = input.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !trimmedInput.isEmpty else {
-            throw SessionImportError.emptyInput
+    /// Validates and normalizes a single raw session shared by CoachPlanner.
+    static func validatedSession(dayOfWeek: String, sessionFee: Double, sessionName: String) throws -> ImportedSession {
+        let trimmedName = sessionName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            throw SessionImportError.emptySessionName
         }
 
-        let rawSessions: [RawSession]
-        do {
-            rawSessions = try JSONDecoder().decode([RawSession].self, from: Data(trimmedInput.utf8))
-        } catch {
-            throw SessionImportError.invalidJSON
+        guard sessionFee > 0 else {
+            throw SessionImportError.invalidFee(trimmedName)
         }
 
-        guard !rawSessions.isEmpty else {
-            throw SessionImportError.noSessions
+        guard let normalizedDay = normalizedWeekday(dayOfWeek) else {
+            throw SessionImportError.invalidDay(dayOfWeek)
         }
 
-        return try rawSessions.map { rawSession in
-            let sessionName = rawSession.sessionName.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !sessionName.isEmpty else {
-                throw SessionImportError.emptySessionName
-            }
-
-            guard rawSession.sessionFee > 0 else {
-                throw SessionImportError.invalidFee(sessionName)
-            }
-
-            guard let normalizedDay = normalizedWeekday(rawSession.dayOfWeek) else {
-                throw SessionImportError.invalidDay(rawSession.dayOfWeek)
-            }
-
-            return ImportedSession(
-                dayOfWeek: normalizedDay,
-                sessionFee: rawSession.sessionFee,
-                sessionName: sessionName
-            )
-        }
+        return ImportedSession(
+            dayOfWeek: normalizedDay,
+            sessionFee: sessionFee,
+            sessionName: trimmedName
+        )
     }
 
     private static func normalizedWeekday(_ day: String) -> String? {

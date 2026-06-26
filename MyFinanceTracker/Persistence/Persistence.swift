@@ -34,12 +34,15 @@ enum AppMigrationPlan: SchemaMigrationPlan {
 // MARK: - Shared container
 
 enum AppContainer {
-    /// One container, shared by SwiftUI's `.modelContainer` modifier and by
-    /// `NetIncomeManager`. Both must use the same store to see the same data.
     static let shared: ModelContainer = {
         do {
             let schema = Schema(versionedSchema: AppSchemaV1.self)
-            let config = ModelConfiguration(schema: schema)
+
+            let config = ModelConfiguration(
+                schema: schema,
+                groupContainer: .none
+            )
+
             return try ModelContainer(
                 for: schema,
                 migrationPlan: AppMigrationPlan.self,
