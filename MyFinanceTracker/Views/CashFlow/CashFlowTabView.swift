@@ -27,29 +27,24 @@ struct CashFlowTabView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                    summaryCard
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-                        .padding(.bottom, 10)
+                List {
+                    cashFlowSection(
+                        title: "Who owes me money",
+                        items: owedToMeItems,
+                        emptyMessage: "No one owes you money.",
+                        emptyImage: "person.fill.questionmark"
+                    )
 
-                    List {
-                        cashFlowSection(
-                            title: "Who owes me money",
-                            items: owedToMeItems,
-                            emptyMessage: "No one owes you money.",
-                            emptyImage: "person.fill.questionmark"
-                        )
-
-                        cashFlowSection(
-                            title: "Who I owe money",
-                            items: iOweItems,
-                            emptyMessage: "You don't owe money to anyone.",
-                            emptyImage: "person.fill.checkmark"
-                        )
-                    }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
-                    .accessibilityIdentifier("cashFlowListView")
+                    cashFlowSection(
+                        title: "Who I owe money",
+                        items: iOweItems,
+                        emptyMessage: "You don't owe money to anyone.",
+                        emptyImage: "person.fill.checkmark"
+                    )
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .accessibilityIdentifier("cashFlowListView")
             }
             .financeBackground()
             .navigationTitle("Cash Flow")
@@ -73,62 +68,7 @@ struct CashFlowTabView: View {
         cashFlowItems.filter { !$0.isOwedToMe }
     }
 
-    private var totalOwedToMe: Double {
-        owedToMeItems.filter { !$0.isSettled }.reduce(0) { $0 + $1.amount }
-    }
-
-    private var totalIOwe: Double {
-        iOweItems.filter { !$0.isSettled }.reduce(0) { $0 + $1.amount }
-    }
-
-    private var netCashFlow: Double {
-        totalOwedToMe - totalIOwe
-    }
-
     // MARK: - Subviews
-
-    private var summaryCard: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("NET POSITION")
-                    .font(.caption.weight(.bold))
-                    .tracking(0.8)
-                    .foregroundStyle(.secondary)
-                Text(netCashFlow.formattedAsCurrency())
-                    .font(.system(.title, design: .rounded, weight: .bold))
-                    .foregroundStyle(netCashFlow >= 0 ? FinanceTheme.income : FinanceTheme.expense)
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-            }
-
-            Divider()
-
-            HStack(spacing: 0) {
-                summaryMetric(label: "Coming in", amount: totalOwedToMe, tint: FinanceTheme.income)
-                Divider().frame(height: 38)
-                summaryMetric(label: "Going out", amount: totalIOwe, tint: FinanceTheme.expense)
-            }
-        }
-        .financeCard(padding: 20)
-    }
-
-    private func summaryMetric(label: String, amount: Double, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(amount.formattedAsCurrency())
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(tint)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .contentTransition(.numericText())
-                .animation(.snappy, value: amount)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-    }
 
     private var addMenu: some View {
         Menu {
