@@ -150,7 +150,20 @@ private struct AddCourtCostView: View {
     let onAdd: (_ additionalCost: Double, _ splitNames: [String]) -> Void
 
     @State private var additionalCostString = ""
-    @State private var splitNames: [String] = []
+    @State private var splitNames: [String]
+
+    init(
+        transactionName: String,
+        transactionAmount: Double,
+        onCancel: @escaping () -> Void,
+        onAdd: @escaping (_ additionalCost: Double, _ splitNames: [String]) -> Void
+    ) {
+        self.transactionName = transactionName
+        self.transactionAmount = transactionAmount
+        self.onCancel = onCancel
+        self.onAdd = onAdd
+        _splitNames = State(initialValue: Self.splitNames(from: transactionName))
+    }
 
     var body: some View {
         NavigationStack {
@@ -186,10 +199,13 @@ private struct AddCourtCostView: View {
                         TextField("Name", text: $splitNames[index])
                             .accessibilityIdentifier("AddCourtCost_NameField_\(index)")
                     }
+                    .onDelete { offsets in
+                        splitNames.remove(atOffsets: offsets)
+                    }
                 } header: {
                     Text("Split")
                 } footer: {
-                    Text("Leave the split empty to add one cash-flow item for the full amount.")
+                    Text("Names are prefilled from commas in the transaction title. Leave the split empty to add one cash-flow item for the full amount.")
                 }
             }
             .navigationTitle("Add Court Cost")
@@ -207,5 +223,12 @@ private struct AddCourtCostView: View {
                 }
             }
         }
+    }
+
+    private static func splitNames(from transactionName: String) -> [String] {
+        transactionName
+            .split(separator: ",", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
     }
 }
