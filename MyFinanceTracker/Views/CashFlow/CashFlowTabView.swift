@@ -136,17 +136,6 @@ struct CashFlowTabView: View {
                     }
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
-                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                        Button {
-                            toggleSettled(item)
-                        } label: {
-                            Label(
-                                item.isSettled ? "Unmark" : "Mark Paid",
-                                systemImage: item.isSettled ? "arrow.uturn.backward.circle" : "checkmark.circle.fill"
-                            )
-                        }
-                        .tint(item.isSettled ? .gray : FinanceTheme.income)
-                    }
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) { delete(item) } label: {
                             Label("Delete", systemImage: "trash")
@@ -165,11 +154,6 @@ struct CashFlowTabView: View {
 
     private func delete(_ item: CashFlowItem) {
         modelContext.delete(item)
-        modelContext.saveOrLog()
-    }
-
-    private func toggleSettled(_ item: CashFlowItem) {
-        item.isSettled.toggle()
         modelContext.saveOrLog()
     }
 }
