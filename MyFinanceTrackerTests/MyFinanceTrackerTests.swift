@@ -59,17 +59,6 @@ struct FinanceSyncTests {
         #expect(deletedIncome == -50)
     }
 
-    @Test func bannerMatchesSyncState() {
-        #expect(financeBannerState(isSignedIn: false, isOnline: true, isSyncing: false, lastError: nil, hasCompletedSync: false) == FinanceBannerState(text: "Sign in to sync", needsAttention: false))
-        #expect(financeBannerState(isSignedIn: false, isOnline: false, isSyncing: false, lastError: "Invalid login", hasCompletedSync: false) == FinanceBannerState(text: "Sign in to sync", needsAttention: true))
-        #expect(financeBannerState(isSignedIn: true, isOnline: false, isSyncing: false, lastError: nil, hasCompletedSync: true) == FinanceBannerState(text: "Offline · saved on this device", needsAttention: false))
-        #expect(financeBannerState(isSignedIn: true, isOnline: false, isSyncing: true, lastError: "offline", hasCompletedSync: true) == FinanceBannerState(text: "Offline · saved on this device", needsAttention: true))
-        #expect(financeBannerState(isSignedIn: true, isOnline: true, isSyncing: true, lastError: nil, hasCompletedSync: false) == FinanceBannerState(text: "Syncing…", needsAttention: false))
-        #expect(financeBannerState(isSignedIn: true, isOnline: true, isSyncing: false, lastError: "Supabase request failed", hasCompletedSync: true) == FinanceBannerState(text: "Sync needs attention", needsAttention: true))
-        #expect(financeBannerState(isSignedIn: true, isOnline: true, isSyncing: false, lastError: nil, hasCompletedSync: false) == FinanceBannerState(text: "Connecting…", needsAttention: false))
-        #expect(financeBannerState(isSignedIn: true, isOnline: true, isSyncing: false, lastError: nil, hasCompletedSync: true) == FinanceBannerState(text: "Synced", needsAttention: false))
-    }
-
     @Test func timestampsRoundTripAndTrimMicroseconds() throws {
         let stamp = Date(timeIntervalSince1970: 1_700_000_000.123)
         let parsed = try #require(SupabaseTimestamp.parse(SupabaseTimestamp.format(stamp)))

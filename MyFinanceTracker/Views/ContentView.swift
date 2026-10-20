@@ -4,7 +4,6 @@ import SwiftUI
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
-    @ObservedObject private var cloud = FinanceCloud.shared
 
     var body: some View {
         TabView {
@@ -27,19 +26,6 @@ struct ContentView: View {
                 }
         }
         .tint(FinanceTheme.accent)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            HStack(spacing: 6) {
-                Image(systemName: cloud.bannerState.needsAttention ? "exclamationmark.icloud" : "icloud")
-                Text(cloud.bannerState.text)
-            }
-            .font(.caption)
-            .foregroundStyle(cloud.bannerState.needsAttention ? Color.orange : Color.secondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 4)
-            .background(.bar)
-            .accessibilityElement(children: .combine)
-            .allowsHitTesting(false)
-        }
         .task {
             await FinanceCloud.shared.sync(in: modelContext)
         }
