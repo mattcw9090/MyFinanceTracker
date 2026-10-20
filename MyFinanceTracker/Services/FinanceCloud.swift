@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import Security
 import SwiftData
 
@@ -82,39 +83,158 @@ final class FinanceCloud: ObservableObject {
         }
 
         do {
-            NetIncomeManager.shared.flushPendingSave()
-            let token = try await validAccessToken()
-            try await verifyWorkspaceAccess(token: token)
-            var uploaded = 0
-            var downloaded = 0
-
-            let cashFlow = try await syncCashFlow(token: token, context: context)
-            uploaded += cashFlow.uploaded
-            downloaded += cashFlow.downloaded
-
-            let predefined = try await syncPredefined(token: token, context: context)
-            uploaded += predefined.uploaded
-            downloaded += predefined.downloaded
-
-            let quickAdd = try await syncQuickAdd(token: token, context: context)
-            uploaded += quickAdd.uploaded
-            downloaded += quickAdd.downloaded
-
-            let transactions = try await syncTransactions(token: token, context: context)
-            uploaded += transactions.uploaded
-            downloaded += transactions.downloaded
-
-            let income = try await syncNetIncome(token: token, context: context)
-            uploaded += income.uploaded
-            downloaded += income.downloaded
-
-            if uploaded == 0 && downloaded == 0 {
-                statusMessage = "Cloud data is up to date."
-            } else {
-                statusMessage = "Sync complete: \(uploaded) uploaded, \(downloaded) downloaded."
-            }
+            try await performSync(in: context)
         } catch {
             statusMessage = error.localizedDescription
+        }
+    }
+
+    /// Ticks one transaction in Supabase. Local completion and cash-flow rows
+    /// arrive only from the pull afterwards. A failure leaves the phone's row unchanged.
+    func completeTransaction(
+        _ transaction: Transaction,
+        addToCashFlow: Bool,
+        additionalCost: Double,
+        splitNames: [String]?,
+        in context: ModelContext
+    ) async throws {
+        let online = await Self.networkIsOnline()
+        guard shouldCompleteTransactionOnline(isSignedIn: isSignedIn, isOnline: online) else {
+            throw FinanceCloudError.needsConnection
+        }
+        guard !transaction.isCompleted, transaction.deletedAt == nil else { return }
+
+        let deadline = Date().addingTimeInterval(60)
+        while isBusy {
+            if Date() >= deadline { throw FinanceCloudError.needsConnection }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+
+        isBusy = true
+        let autosave = context.autosaveEnabled
+        context.autosaveEnabled = false
+        defer {
+            context.autosaveEnabled = autosave
+            isBusy = false
+        }
+
+        do {
+            try await pushTransactionIfNeeded(transaction, context: context)
+            let token = try await validAccessToken()
+            try await invokeCompleteFinanceTransaction(
+                id: transaction.id,
+                addToCashFlow: addToCashFlow,
+                additionalCost: additionalCost,
+                splitNames: splitNames,
+                token: token
+            )
+        } catch {
+            throw FinanceCloudError.needsConnection
+        }
+
+        do {
+            try await performSync(in: context)
+        } catch {
+            throw FinanceCloudError.completionNotDownloaded
+        }
+    }
+
+    private func performSync(in context: ModelContext) async throws {
+        NetIncomeManager.shared.flushPendingSave()
+        let token = try await validAccessToken()
+        try await verifyWorkspaceAccess(token: token)
+        var uploaded = 0
+        var downloaded = 0
+
+        let cashFlow = try await syncCashFlow(token: token, context: context)
+        uploaded += cashFlow.uploaded
+        downloaded += cashFlow.downloaded
+
+        let predefined = try await syncPredefined(token: token, context: context)
+        uploaded += predefined.uploaded
+        downloaded += predefined.downloaded
+
+        let quickAdd = try await syncQuickAdd(token: token, context: context)
+        uploaded += quickAdd.uploaded
+        downloaded += quickAdd.downloaded
+
+        let transactions = try await syncTransactions(token: token, context: context)
+        uploaded += transactions.uploaded
+        downloaded += transactions.downloaded
+
+        let income = try await syncNetIncome(token: token, context: context)
+        uploaded += income.uploaded
+        downloaded += income.downloaded
+
+        if uploaded == 0 && downloaded == 0 {
+            statusMessage = "Cloud data is up to date."
+        } else {
+            statusMessage = "Sync complete: \(uploaded) uploaded, \(downloaded) downloaded."
+        }
+    }
+
+    private func pushTransactionIfNeeded(_ transaction: Transaction, context: ModelContext) async throws {
+        guard transaction.needsCloudUpload else { return }
+        let token = try await validAccessToken()
+        let stamp = transaction.updatedAt
+        let savedAt = try await upsert(
+            table: "finance_transactions",
+            body: transactionBody(transaction),
+            token: token
+        )
+        guard transaction.updatedAt == stamp else { throw FinanceCloudError.needsConnection }
+        transaction.updatedAt = savedAt
+        transaction.lastSyncedAt = savedAt
+        try context.save()
+    }
+
+    private func invokeCompleteFinanceTransaction(
+        id: UUID,
+        addToCashFlow: Bool,
+        additionalCost: Double,
+        splitNames: [String]?,
+        token: String
+    ) async throws {
+        let call = completeFinanceTransactionCall(
+            transactionID: id,
+            addToCashFlow: addToCashFlow,
+            additionalCost: additionalCost,
+            splitNames: splitNames
+        )
+        let url = Self.endpoint(path: call.path, query: [])
+        let payload = try JSONSerialization.data(withJSONObject: completeFinanceTransactionBody(call))
+        let data = try await send(url: url, method: call.httpMethod, body: payload, token: token)
+        guard (try? JSONDecoder().decode(Int.self, from: data)) != nil else {
+            throw FinanceCloudError.invalidResponse
+        }
+    }
+
+    private func transactionBody(_ item: Transaction) -> [String: Any] {
+        [
+            "id": item.id.uuidString.lowercased(),
+            "workspace_id": FinanceCloudConfiguration.workspaceID.uuidString.lowercased(),
+            "description": item.desc ?? NSNull(),
+            "amount": item.amount,
+            "day_of_week": item.dayOfWeek ?? NSNull(),
+            "is_completed": item.isCompleted,
+            "is_income": item.isIncome,
+            "updated_at": SupabaseTimestamp.format(item.updatedAt),
+            "deleted_at": item.deletedAt.map(SupabaseTimestamp.format) ?? NSNull()
+        ]
+    }
+
+    private static func networkIsOnline() async -> Bool {
+        await withCheckedContinuation { continuation in
+            let monitor = NWPathMonitor()
+            let queue = DispatchQueue(label: "MyFinanceTracker.complete.connectivity")
+            var resumed = false
+            monitor.pathUpdateHandler = { path in
+                guard !resumed else { return }
+                resumed = true
+                monitor.cancel()
+                continuation.resume(returning: path.status == .satisfied)
+            }
+            monitor.start(queue: queue)
         }
     }
 
@@ -374,17 +494,7 @@ final class FinanceCloud: ObservableObject {
         }
         try context.save()
         counts.uploaded += try await upload(pending, table: "finance_transactions", token: token, context: context) { item in
-            [
-                "id": item.id.uuidString.lowercased(),
-                "workspace_id": FinanceCloudConfiguration.workspaceID.uuidString.lowercased(),
-                "description": item.desc ?? NSNull(),
-                "amount": item.amount,
-                "day_of_week": item.dayOfWeek ?? NSNull(),
-                "is_completed": item.isCompleted,
-                "is_income": item.isIncome,
-                "updated_at": SupabaseTimestamp.format(item.updatedAt),
-                "deleted_at": item.deletedAt.map(SupabaseTimestamp.format) ?? NSNull()
-            ]
+            transactionBody(item)
         }
         return counts
     }
@@ -631,7 +741,9 @@ final class FinanceCloud: ObservableObject {
     private static func endpoint(path: String, query: [URLQueryItem]) -> URL {
         var components = URLComponents(url: FinanceCloudConfiguration.projectURL, resolvingAgainstBaseURL: false)!
         components.path = path
-        components.queryItems = query
+        if !query.isEmpty {
+            components.queryItems = query
+        }
         return components.url!
     }
 
@@ -798,6 +910,8 @@ enum FinanceCloudError: LocalizedError {
     case workspaceUnavailable
     case invalidResponse
     case requestFailed(String)
+    case needsConnection
+    case completionNotDownloaded
 
     var errorDescription: String? {
         switch self {
@@ -809,6 +923,10 @@ enum FinanceCloudError: LocalizedError {
             return "Supabase returned an invalid response. Local data was kept."
         case .requestFailed(let message):
             return "Supabase request failed: \(message)"
+        case .needsConnection:
+            return "Ticking a transaction needs an internet connection."
+        case .completionNotDownloaded:
+            return "The transaction was ticked online, but this phone couldn't download it. Pull to refresh."
         }
     }
 }

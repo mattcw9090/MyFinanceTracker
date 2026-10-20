@@ -59,6 +59,45 @@ struct FinanceSyncTests {
         #expect(deletedIncome == -50)
     }
 
+    @Test func tickingNeedsAConnectionBeforeAnyRequest() {
+        #expect(shouldCompleteTransactionOnline(isSignedIn: false, isOnline: true) == false)
+        #expect(shouldCompleteTransactionOnline(isSignedIn: true, isOnline: false) == false)
+        #expect(shouldCompleteTransactionOnline(isSignedIn: true, isOnline: true))
+        #expect(FinanceCloudError.needsConnection.errorDescription == "Ticking a transaction needs an internet connection.")
+    }
+
+    @Test func completeRequestTicksWithoutCashFlow() throws {
+        let id = try #require(UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"))
+        let call = completeFinanceTransactionCall(
+            transactionID: id,
+            addToCashFlow: false,
+            additionalCost: 0,
+            splitNames: nil
+        )
+        #expect(call.httpMethod == "POST")
+        #expect(call.path == "/rest/v1/rpc/complete_finance_transaction")
+        let json = try jsonObject(from: completeFinanceTransactionBody(call))
+        #expect(json["p_transaction_id"] as? String == "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+        #expect(json["p_add_to_cash_flow"] as? Bool == false)
+        #expect(json["p_additional_cost"] as? Double == 0)
+        #expect(json["p_split_names"] is NSNull)
+    }
+
+    @Test func completeRequestSendsCourtCostAndUntrimmedNames() throws {
+        let id = UUID()
+        let call = completeFinanceTransactionCall(
+            transactionID: id,
+            addToCashFlow: true,
+            additionalCost: 31,
+            splitNames: ["Ann", " "]
+        )
+        let json = try jsonObject(from: completeFinanceTransactionBody(call))
+        #expect(json["p_transaction_id"] as? String == id.uuidString.lowercased())
+        #expect(json["p_add_to_cash_flow"] as? Bool == true)
+        #expect((json["p_additional_cost"] as? NSNumber)?.doubleValue == 31)
+        #expect(json["p_split_names"] as? [String] == ["Ann", " "])
+    }
+
     @Test func timestampsRoundTripAndTrimMicroseconds() throws {
         let stamp = Date(timeIntervalSince1970: 1_700_000_000.123)
         let parsed = try #require(SupabaseTimestamp.parse(SupabaseTimestamp.format(stamp)))
@@ -128,5 +167,10 @@ struct FinanceSyncTests {
         #expect(balances.count == 1)
         #expect(balances[0].value == 80)
         #expect(balances[0].deletedAt == nil)
+    }
+
+    private func jsonObject(from body: [String: Any]) throws -> [String: Any] {
+        let data = try JSONSerialization.data(withJSONObject: body)
+        return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
     }
 }

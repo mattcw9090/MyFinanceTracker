@@ -60,6 +60,46 @@ func transactionBalanceDelta(
         - transactionBalanceContribution(amount: oldAmount, isIncome: oldIsIncome, isDeleted: oldIsDeleted)
 }
 
+struct CompleteFinanceTransactionCall: Equatable {
+    var httpMethod: String
+    var path: String
+    var transactionID: String
+    var addToCashFlow: Bool
+    var additionalCost: Double
+    var splitNames: [String]?
+}
+
+/// Builds the PostgREST body for `public.complete_finance_transaction`.
+/// Names are sent as entered; the database trims and drops blanks.
+func completeFinanceTransactionCall(
+    transactionID: UUID,
+    addToCashFlow: Bool,
+    additionalCost: Double,
+    splitNames: [String]?
+) -> CompleteFinanceTransactionCall {
+    CompleteFinanceTransactionCall(
+        httpMethod: "POST",
+        path: "/rest/v1/rpc/complete_finance_transaction",
+        transactionID: transactionID.uuidString.lowercased(),
+        addToCashFlow: addToCashFlow,
+        additionalCost: additionalCost,
+        splitNames: splitNames
+    )
+}
+
+func completeFinanceTransactionBody(_ call: CompleteFinanceTransactionCall) -> [String: Any] {
+    [
+        "p_transaction_id": call.transactionID,
+        "p_add_to_cash_flow": call.addToCashFlow,
+        "p_additional_cost": call.additionalCost,
+        "p_split_names": call.splitNames.map { $0 as Any } ?? NSNull()
+    ]
+}
+
+func shouldCompleteTransactionOnline(isSignedIn: Bool, isOnline: Bool) -> Bool {
+    isSignedIn && isOnline
+}
+
 enum SupabaseTimestamp {
     private static let fractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
