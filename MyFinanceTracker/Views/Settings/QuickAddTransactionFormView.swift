@@ -108,6 +108,7 @@ struct QuickAddTransactionFormView: View {
         target.desc = descriptionText
         target.amount = Double(amount) ?? 0.0
         target.isIncome = isIncome
+        target.markLocalEdit()
 
         do {
             try modelContext.save()

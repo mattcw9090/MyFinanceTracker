@@ -98,6 +98,7 @@ struct CashFlowItemFormView: View {
         target.name = name
         target.amount = Double(amount) ?? 0.0
         target.isOwedToMe = isOwedToMe
+        target.markLocalEdit()
 
         do {
             try modelContext.save()

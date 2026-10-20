@@ -6,6 +6,10 @@ struct SettingsTabView: View {
 
     @Query(sort: \PredefinedTransaction.dayOfWeek) private var predefinedTransactions: [PredefinedTransaction]
     @Query(sort: \QuickAddTransaction.desc) private var quickAddTransactions: [QuickAddTransaction]
+    @ObservedObject private var cloud = FinanceCloud.shared
+
+    @State private var email = ""
+    @State private var password = ""
 
     @State private var showingAddPredefinedTransaction = false
     @State private var predefinedTransactionToEdit: PredefinedTransaction?
@@ -18,6 +22,7 @@ struct SettingsTabView: View {
     var body: some View {
         NavigationStack {
             List {
+                    cloudSection
                     Section {
                         HStack(spacing: 14) {
                             Image(systemName: "wand.and.stars")
@@ -41,6 +46,14 @@ struct SettingsTabView: View {
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
             .financeBackground()
+            .refreshable {
+                await cloud.sync(in: modelContext)
+            }
+            .onAppear {
+                if email.isEmpty {
+                    email = cloud.savedEmail
+                }
+            }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -93,7 +106,7 @@ struct SettingsTabView: View {
     @ViewBuilder
     private var predefinedGroup: some View {
         Section {
-            if predefinedTransactions.isEmpty {
+            if visiblePredefined.isEmpty {
                 EmptyStateView(
                     message: "No predefined transactions. Add some to get started.",
                     imageName: "tray"
@@ -101,7 +114,7 @@ struct SettingsTabView: View {
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
             } else {
-                let dailyItems = predefinedTransactions.filter { $0.repeatsEveryDay }
+                let dailyItems = visiblePredefined.filter { $0.repeatsEveryDay }
                 if !dailyItems.isEmpty {
                     SectionSubHeader(text: "Every day", tint: FinanceTheme.accent)
 
@@ -125,7 +138,7 @@ struct SettingsTabView: View {
                 }
 
                 ForEach(daysOfWeek, id: \.self) { day in
-                    let items = predefinedTransactions.filter { $0.dayOfWeek == day }
+                    let items = visiblePredefined.filter { $0.dayOfWeek == day }
                     if !items.isEmpty {
                         SectionSubHeader(text: day)
 
@@ -172,7 +185,7 @@ struct SettingsTabView: View {
     @ViewBuilder
     private var quickAddGroup: some View {
         Section {
-            if quickAddTransactions.isEmpty {
+            if visibleQuickAdd.isEmpty {
                 EmptyStateView(
                     message: "No quick add transactions. Add some to get started.",
                     imageName: "plus.circle"
@@ -180,8 +193,8 @@ struct SettingsTabView: View {
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
             } else {
-                let income = quickAddTransactions.filter { $0.isIncome }
-                let expense = quickAddTransactions.filter { !$0.isIncome }
+                let income = visibleQuickAdd.filter { $0.isIncome }
+                let expense = visibleQuickAdd.filter { !$0.isIncome }
 
                 if !income.isEmpty {
                     SectionSubHeader(text: "Income", tint: FinanceTheme.income)
@@ -220,16 +233,78 @@ struct SettingsTabView: View {
 
     // MARK: - Helpers
 
+    private var visiblePredefined: [PredefinedTransaction] {
+        predefinedTransactions.filter { $0.deletedAt == nil }
+    }
+
+    private var visibleQuickAdd: [QuickAddTransaction] {
+        quickAddTransactions.filter { $0.deletedAt == nil }
+    }
+
+    private var cloudSection: some View {
+        Section {
+            if cloud.isSignedIn {
+                LabeledContent("Account", value: cloud.savedEmail.isEmpty ? "Signed in" : cloud.savedEmail)
+                Button {
+                    Task { await cloud.sync(in: modelContext) }
+                } label: {
+                    if cloud.isBusy {
+                        ProgressView()
+                    } else {
+                        Text("Sync now")
+                    }
+                }
+                .disabled(cloud.isBusy)
+                .accessibilityIdentifier("Cloud_SyncButton")
+                Button("Sign out", role: .destructive) {
+                    cloud.signOut()
+                }
+                .accessibilityIdentifier("Cloud_SignOutButton")
+            } else {
+                TextField("Email", text: $email)
+                    .textContentType(.username)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .accessibilityIdentifier("Cloud_EmailField")
+                SecureField("Password", text: $password)
+                    .textContentType(.password)
+                    .accessibilityIdentifier("Cloud_PasswordField")
+                Button("Sign in") {
+                    let email = email
+                    let password = password
+                    Task {
+                        await cloud.signIn(email: email, password: password)
+                        guard cloud.isSignedIn else { return }
+                        self.password = ""
+                        await cloud.sync(in: modelContext)
+                    }
+                }
+                .disabled(cloud.isBusy || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.isEmpty)
+                .accessibilityIdentifier("Cloud_SignInButton")
+            }
+            if let statusMessage = cloud.statusMessage {
+                Text(statusMessage)
+                    .font(.footnote)
+                    .foregroundStyle(statusMessage.hasPrefix("Sync") || statusMessage == "Signed in." || statusMessage.hasPrefix("Signed out") ? .secondary : FinanceTheme.expense)
+            }
+        } header: {
+            Text("Cloud")
+        } footer: {
+            Text("Uses the same sign-in as CoachPlanner. This phone keeps its own copy and syncs when you open the app or pull to refresh. Signing out leaves that copy here.")
+        }
+    }
+
     private func deletePredefinedTransaction(_ offsets: IndexSet, from transactionsForDay: [PredefinedTransaction]) {
         withAnimation {
-            offsets.map { transactionsForDay[$0] }.forEach(modelContext.delete)
+            offsets.map { transactionsForDay[$0] }.forEach { $0.markDeleted() }
             modelContext.saveOrLog()
         }
     }
 
     private func deleteQuickAddTransaction(offsets: IndexSet, from transactionsSubset: [QuickAddTransaction]) {
         withAnimation {
-            offsets.map { transactionsSubset[$0] }.forEach(modelContext.delete)
+            offsets.map { transactionsSubset[$0] }.forEach { $0.markDeleted() }
             modelContext.saveOrLog()
         }
     }

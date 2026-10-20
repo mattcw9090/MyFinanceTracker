@@ -18,11 +18,7 @@ struct NetIncomeTabView: View {
     @State private var selectedDay: String = Weekday.today
     @State private var activeAlert: ActiveAlert?
 
-    @Query(
-        filter: #Predicate<Transaction> { !$0.isCompleted },
-        sort: \Transaction.dayOfWeek,
-        animation: .default
-    )
+    @Query(sort: \Transaction.dayOfWeek, animation: .default)
     private var transactions: [Transaction]
 
     var body: some View {
@@ -143,7 +139,7 @@ struct NetIncomeTabView: View {
     }
 
     private func transactionsForDay(_ day: String) -> [Transaction] {
-        transactions.filter { $0.dayOfWeek == day }
+        transactions.filter { $0.dayOfWeek == day && !$0.isCompleted && $0.deletedAt == nil }
     }
 
     private var daySelector: some View {
@@ -186,8 +182,12 @@ struct NetIncomeTabView: View {
 
     private func resetAll() {
         do {
-            try modelContext.delete(model: Transaction.self)
+            let existing = try modelContext.fetch(FetchDescriptor<Transaction>())
+            for transaction in existing where transaction.deletedAt == nil {
+                transaction.markDeleted()
+            }
             netIncomeManager.resetNetIncome()
+            try modelContext.save()
             activeAlert = .success
         } catch {
             print("Failed to reset: \(error.localizedDescription)")
@@ -202,6 +202,7 @@ struct NetIncomeTabView: View {
                 sortBy: [SortDescriptor(\.dayOfWeek)]
             )
             let predefinedTransactions = try modelContext.fetch(descriptor)
+                .filter { $0.deletedAt == nil }
 
             if predefinedTransactions.isEmpty {
                 activeAlert = .noPredefinedTransactions
@@ -229,6 +230,7 @@ struct NetIncomeTabView: View {
                     }
                 }
 
+                netIncomeManager.flushPendingSave()
                 try modelContext.save()
                 activeAlert = .success
             }

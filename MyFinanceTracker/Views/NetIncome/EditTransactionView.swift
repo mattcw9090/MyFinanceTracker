@@ -105,6 +105,7 @@ struct EditTransactionView: View {
         transaction.amount = newAmount
         transaction.dayOfWeek = selectedDay
         transaction.isIncome = isIncome
+        transaction.markLocalEdit()
 
         // Adjust net income
         netIncomeManager.adjustNetIncome(by: oldAmount, isIncome: wasIncome, isDeletion: true)

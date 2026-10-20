@@ -73,11 +73,11 @@ struct AddTransactionView: View {
                     }
                     .financeCard(padding: 18)
 
-                    if !quickAddTransactions.isEmpty {
+                    if !visibleQuickAdds.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             FinanceSectionLabel(title: "Quick add", detail: "Tap to save")
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                                ForEach(quickAddTransactions, id: \.id) { transaction in
+                                ForEach(visibleQuickAdds, id: \.id) { transaction in
                                     Button { applyQuickAddTransaction(transaction) } label: {
                                         VStack(alignment: .leading, spacing: 8) {
                                             Image(systemName: "bolt.fill")
@@ -139,6 +139,10 @@ struct AddTransactionView: View {
             desc: descriptionText,
             isIncome: isIncome
         )
+    }
+
+    private var visibleQuickAdds: [QuickAddTransaction] {
+        quickAddTransactions.filter { $0.deletedAt == nil }
     }
 
     private func applyQuickAddTransaction(_ template: QuickAddTransaction) {

@@ -10,6 +10,7 @@ final class NetIncomeManager: ObservableObject {
     }
 
     private var saveTask: Task<Void, Never>?
+    private var suppressSave = false
 
     private var context: ModelContext { AppContainer.shared.mainContext }
 
@@ -23,17 +24,40 @@ final class NetIncomeManager: ObservableObject {
     }
 
     func resetNetIncome() {
-        do {
-            try context.delete(model: NetIncomeEntity.self)
-            netIncome = 0.0
-        } catch {
-            print("Failed to reset net income: \(error.localizedDescription)")
-        }
+        netIncome = 0.0
+        flushPendingSave()
+    }
+
+    /// Writes the debounced balance immediately so a sync sees the latest value.
+    func flushPendingSave() {
+        saveTask?.cancel()
+        saveTask = nil
+        saveNetIncome()
+    }
+
+    /// Includes a remote transaction that this phone had not already counted.
+    /// Completing a transaction does not come through here.
+    func applyRemoteTransactionDelta(_ delta: Double) {
+        guard delta != 0 else { return }
+        suppressSave = true
+        netIncome += delta
+        suppressSave = false
+        flushPendingSave()
+    }
+
+    /// Reloads the published balance after a newer cloud row was applied.
+    func adoptStoredValue() {
+        saveTask?.cancel()
+        saveTask = nil
+        suppressSave = true
+        netIncome = (try? canonicalEntity())?.value ?? 0
+        suppressSave = false
     }
 
     // MARK: - Persistence
 
     private func scheduleSave() {
+        guard !suppressSave else { return }
         saveTask?.cancel()
         saveTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(500))
@@ -44,13 +68,12 @@ final class NetIncomeManager: ObservableObject {
 
     private func saveNetIncome() {
         do {
-            let descriptor = FetchDescriptor<NetIncomeEntity>()
-            let results = try context.fetch(descriptor)
-            if let entity = results.first {
+            if let entity = try canonicalEntity() {
+                guard entity.value != netIncome else { return }
                 entity.value = netIncome
+                entity.markLocalEdit()
             } else {
-                let entity = NetIncomeEntity(value: netIncome)
-                context.insert(entity)
+                context.insert(NetIncomeEntity(value: netIncome))
             }
             try context.save()
         } catch {
@@ -60,17 +83,29 @@ final class NetIncomeManager: ObservableObject {
 
     private func loadNetIncome() {
         do {
-            let descriptor = FetchDescriptor<NetIncomeEntity>()
-            let results = try context.fetch(descriptor)
-            if let entity = results.first {
+            if let entity = try canonicalEntity() {
+                suppressSave = true
                 netIncome = entity.value
+                suppressSave = false
             } else {
-                let entity = NetIncomeEntity(value: 0.0)
-                context.insert(entity)
+                context.insert(NetIncomeEntity(value: 0.0))
                 try context.save()
+                suppressSave = true
+                netIncome = 0
+                suppressSave = false
             }
         } catch {
             print("Failed to load net income: \(error.localizedDescription)")
         }
+    }
+
+    /// The live balance is the newest row that has not been soft-deleted.
+    private func canonicalEntity() throws -> NetIncomeEntity? {
+        try context.fetch(FetchDescriptor<NetIncomeEntity>())
+            .filter { $0.deletedAt == nil }
+            .max { lhs, rhs in
+                if lhs.updatedAt != rhs.updatedAt { return lhs.updatedAt < rhs.updatedAt }
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
     }
 }

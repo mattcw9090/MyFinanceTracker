@@ -1,6 +1,10 @@
+import SwiftData
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some View {
         TabView {
             NetIncomeTabView()
@@ -22,5 +26,12 @@ struct ContentView: View {
                 }
         }
         .tint(FinanceTheme.accent)
+        .task {
+            await FinanceCloud.shared.sync(in: modelContext)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active || phase == .background else { return }
+            Task { await FinanceCloud.shared.sync(in: modelContext) }
+        }
     }
 }

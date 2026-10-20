@@ -145,6 +145,7 @@ struct PredefinedTransactionFormView: View {
         target.amount = Double(amount) ?? 0.0
         target.dayOfWeek = repeatsEveryDay ? PredefinedTransaction.everyDaySchedule : selectedDay
         target.isIncome = isIncome
+        target.markLocalEdit()
 
         do {
             try modelContext.save()

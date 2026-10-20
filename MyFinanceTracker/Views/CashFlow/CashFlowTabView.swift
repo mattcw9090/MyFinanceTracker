@@ -45,6 +45,9 @@ struct CashFlowTabView: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .accessibilityIdentifier("cashFlowListView")
+                .refreshable {
+                    await FinanceCloud.shared.sync(in: modelContext)
+                }
             }
             .financeBackground()
             .navigationTitle("Cash Flow")
@@ -61,11 +64,11 @@ struct CashFlowTabView: View {
     // MARK: - Derived state
 
     private var owedToMeItems: [CashFlowItem] {
-        cashFlowItems.filter { $0.isOwedToMe }
+        cashFlowItems.filter { $0.deletedAt == nil && $0.isOwedToMe }
     }
 
     private var iOweItems: [CashFlowItem] {
-        cashFlowItems.filter { !$0.isOwedToMe }
+        cashFlowItems.filter { $0.deletedAt == nil && !$0.isOwedToMe }
     }
 
     // MARK: - Subviews
@@ -153,7 +156,7 @@ struct CashFlowTabView: View {
     }
 
     private func delete(_ item: CashFlowItem) {
-        modelContext.delete(item)
+        item.markDeleted()
         modelContext.saveOrLog()
     }
 }

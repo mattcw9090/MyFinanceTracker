@@ -28,6 +28,9 @@ struct TransactionListView: View {
                     .frame(maxWidth: .infinity)
                     .financeCard(padding: 28)
                 }
+                .refreshable {
+                    await FinanceCloud.shared.sync(in: modelContext)
+                }
             } else {
                 ScrollView {
                     LazyVStack(spacing: 10) {
@@ -48,6 +51,9 @@ struct TransactionListView: View {
                         }
                     }
                     .padding(.bottom, 24)
+                }
+                .refreshable {
+                    await FinanceCloud.shared.sync(in: modelContext)
                 }
             }
         }
@@ -97,12 +103,13 @@ struct TransactionListView: View {
         guard !transaction.isCompleted else { return }
 
         transaction.isCompleted = true
+        transaction.markLocalEdit()
         modelContext.saveOrLog()
     }
 
     private func deleteTransaction(_ transaction: Transaction) {
         netIncomeManager.adjustNetIncome(by: transaction.amount, isIncome: transaction.isIncome, isDeletion: true)
-        modelContext.delete(transaction)
+        transaction.markDeleted()
         modelContext.saveOrLog()
     }
 
