@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import Security
 import SwiftData
 
@@ -15,19 +16,41 @@ final class FinanceCloud: ObservableObject {
 
     @Published private(set) var isSignedIn = false
     @Published private(set) var isBusy = false
+    @Published private(set) var isSyncing = false
+    @Published private(set) var isOnline = true
+    @Published private(set) var lastError: String?
     @Published private(set) var statusMessage: String?
     @Published private(set) var savedEmail: String
 
     private let keychain = FinanceKeychain()
     private let defaults: UserDefaults
+    private let monitor = NWPathMonitor()
     private var accessToken: String?
     private var tokenRefreshTask: Task<String, Error>?
+    private var hasCompletedSync = false
+
+    var bannerState: FinanceBannerState {
+        financeBannerState(
+            isSignedIn: isSignedIn,
+            isOnline: isOnline,
+            isSyncing: isSyncing,
+            lastError: lastError,
+            hasCompletedSync: hasCompletedSync
+        )
+    }
 
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         savedEmail = defaults.string(forKey: FinanceCloudConfiguration.emailDefaultsKey) ?? ""
         accessToken = keychain.read("access_token")
         isSignedIn = accessToken != nil || keychain.read("refresh_token") != nil
+        monitor.pathUpdateHandler = { [weak self] path in
+            let online = path.status == .satisfied
+            Task { @MainActor in
+                self?.isOnline = online
+            }
+        }
+        monitor.start(queue: DispatchQueue(label: "MyFinanceTracker.sync.connectivity"))
     }
 
     func signIn(email: String, password: String) async {
@@ -36,6 +59,7 @@ final class FinanceCloud: ObservableObject {
         isBusy = true
         defer { isBusy = false }
         statusMessage = nil
+        lastError = nil
         do {
             let session = try await authenticate(email: email, password: password)
             try await verifyWorkspaceAccess(token: session.accessToken)
@@ -53,6 +77,7 @@ final class FinanceCloud: ObservableObject {
             keychain.delete("access_token")
             keychain.delete("refresh_token")
             isSignedIn = false
+            lastError = error.localizedDescription
             statusMessage = error.localizedDescription
         }
     }
@@ -62,6 +87,7 @@ final class FinanceCloud: ObservableObject {
         tokenRefreshTask = nil
         accessToken = nil
         isSignedIn = false
+        lastError = nil
         statusMessage = "Signed out. The copy on this phone is unchanged."
         keychain.delete("access_token")
         keychain.delete("refresh_token")
@@ -74,11 +100,13 @@ final class FinanceCloud: ObservableObject {
         guard !isBusy else { return }
         guard isSignedIn else { return }
         isBusy = true
+        isSyncing = true
         let autosave = context.autosaveEnabled
         context.autosaveEnabled = false
         defer {
             context.autosaveEnabled = autosave
             isBusy = false
+            isSyncing = false
         }
 
         do {
@@ -108,12 +136,15 @@ final class FinanceCloud: ObservableObject {
             uploaded += income.uploaded
             downloaded += income.downloaded
 
+            lastError = nil
+            hasCompletedSync = true
             if uploaded == 0 && downloaded == 0 {
                 statusMessage = "Cloud data is up to date."
             } else {
                 statusMessage = "Sync complete: \(uploaded) uploaded, \(downloaded) downloaded."
             }
         } catch {
+            lastError = error.localizedDescription
             statusMessage = error.localizedDescription
         }
     }

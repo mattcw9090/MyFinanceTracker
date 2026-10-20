@@ -60,6 +60,37 @@ func transactionBalanceDelta(
         - transactionBalanceContribution(amount: oldAmount, isIncome: oldIsIncome, isDeleted: oldIsDeleted)
 }
 
+struct FinanceBannerState: Equatable {
+    var text: String
+    var needsAttention: Bool
+}
+
+/// Same priority as CoachPlanner's status line. The banner stays on screen.
+func financeBannerState(
+    isSignedIn: Bool,
+    isOnline: Bool,
+    isSyncing: Bool,
+    lastError: String?,
+    hasCompletedSync: Bool
+) -> FinanceBannerState {
+    let needsAttention = lastError != nil
+    let text: String
+    if !isSignedIn {
+        text = "Sign in to sync"
+    } else if !isOnline {
+        text = "Offline · saved on this device"
+    } else if isSyncing {
+        text = "Syncing…"
+    } else if needsAttention {
+        text = "Sync needs attention"
+    } else if !hasCompletedSync {
+        text = "Connecting…"
+    } else {
+        text = "Synced"
+    }
+    return FinanceBannerState(text: text, needsAttention: needsAttention)
+}
+
 enum SupabaseTimestamp {
     private static let fractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
