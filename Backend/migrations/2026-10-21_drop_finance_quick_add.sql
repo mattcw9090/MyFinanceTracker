@@ -72,7 +72,7 @@ end;
 $$;
 
 comment on function public.reset_finance_week() is
-  'Same as Reset in MyFinanceTracker: soft-deletes every live finance transaction, including completed and coaching-linked rows, and sets the canonical net income to 0. Does not change cash flow, quick add, or predefined rows. A second call changes nothing.';
+  'Same as Reset in MyFinanceTracker: soft-deletes every live finance transaction, including completed and coaching-linked rows, and sets the canonical net income to 0. Does not change cash flow or predefined rows. A second call changes nothing.';
 
 -- Initialize Week: reset, then copy live predefined transactions into new
 -- unticked transactions. "Every day" becomes Monday–Sunday. A null day uses
