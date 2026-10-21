@@ -169,6 +169,47 @@ func shouldCompleteTransactionOnline(isSignedIn: Bool, isOnline: Bool) -> Bool {
     isSignedIn && isOnline
 }
 
+enum IncomeTickChoice: Equatable {
+    case tick
+    case addToCashFlow
+    case cancel
+}
+
+/// Cancel leaves the row unticked and must not call `complete_finance_transaction`.
+/// Tick and Add to who owes me both complete it.
+func shouldCompleteTransaction(for choice: IncomeTickChoice) -> Bool {
+    switch choice {
+    case .tick, .addToCashFlow:
+        return true
+    case .cancel:
+        return false
+    }
+}
+
+struct PredefinedWeekRow: Equatable {
+    var amount: Double
+    var isIncome: Bool
+    var dayOfWeek: String?
+    var isDeleted: Bool = false
+}
+
+func initializeWeekConfirmationMessage(total: Double) -> String {
+    "This replaces this week’s transactions with your predefined ones. The balance becomes \(total.formattedAsCurrency())."
+}
+
+/// Signed total Initialize Week writes after replacing this week's transactions.
+/// Income is positive and expense is negative. "Every day" counts as seven rows.
+/// A missing day counts once, on `unscheduledDay`, matching `reinitialize_finance_week`.
+func predefinedWeekBalance(_ rows: [PredefinedWeekRow], unscheduledDay: String) -> Double {
+    rows.reduce(0) { sum, row in
+        guard !row.isDeleted else { return sum }
+        let day = row.dayOfWeek ?? unscheduledDay
+        let copies = day == PredefinedTransaction.everyDaySchedule ? 7.0 : 1.0
+        let signed = row.isIncome ? row.amount : -row.amount
+        return sum + signed * copies
+    }
+}
+
 func shouldImportSessionsOnline(isSignedIn: Bool, isOnline: Bool) -> Bool {
     isSignedIn && isOnline
 }

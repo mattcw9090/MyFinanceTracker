@@ -78,8 +78,8 @@ struct BulkAddCashFlowItemsView: View {
                     .font(.headline)
                     .foregroundColor(.primary)
                 Picker("Type", selection: $isOwedToMe) {
-                    Label("Owed to Me", systemImage: "arrow.down.circle.fill").tag(true)
-                    Label("I Owe", systemImage: "arrow.up.circle.fill").tag(false)
+                    Label("Owed to Me", systemImage: FinanceMark.income).tag(true)
+                    Label("I Owe", systemImage: FinanceMark.expense).tag(false)
                 }
                 .pickerStyle(.segmented)
                 .tint(FinanceTheme.accent)
@@ -90,15 +90,8 @@ struct BulkAddCashFlowItemsView: View {
                 Text("Amount (per person)")
                     .font(.headline)
                     .foregroundColor(.primary)
-                HStack {
-                    Image(systemName: "dollarsign.circle")
-                        .foregroundColor(.secondary)
-                    TextField("Enter amount", text: $amount)
-                        .decimalInput($amount)
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .accessibilityIdentifier("BulkAdd_AmountField")
-                }
-                .financeField()
+                CurrencyAmountField(amount: $amount, identifier: "BulkAdd_AmountField")
+                    .financeField()
             }
         }
         .financeCard(padding: 18)

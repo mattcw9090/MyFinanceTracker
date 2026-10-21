@@ -41,7 +41,7 @@ struct CashFlowItemFormView: View {
             _isOwedToMe = State(initialValue: defaultOwedToMe)
         case .edit(let item):
             _name = State(initialValue: item.name ?? "")
-            _amount = State(initialValue: String(item.amount))
+            _amount = State(initialValue: item.amount.amountFieldText())
             _isOwedToMe = State(initialValue: item.isOwedToMe)
         }
     }

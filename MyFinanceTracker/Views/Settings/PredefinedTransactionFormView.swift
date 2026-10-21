@@ -45,7 +45,7 @@ struct PredefinedTransactionFormView: View {
             _isIncome = State(initialValue: true)
         case .edit(let tx):
             _descriptionText = State(initialValue: tx.desc ?? "")
-            _amount = State(initialValue: String(tx.amount))
+            _amount = State(initialValue: tx.amount.amountFieldText())
             _selectedDay = State(initialValue: tx.repeatsEveryDay ? "Monday" : (tx.dayOfWeek ?? "Monday"))
             _repeatsEveryDay = State(initialValue: tx.repeatsEveryDay)
             _isIncome = State(initialValue: tx.isIncome)
@@ -54,57 +54,44 @@ struct PredefinedTransactionFormView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                    Section(header: Text("Description").font(.headline)) {
-                        TextField("Enter description", text: $descriptionText)
-                            .accessibilityIdentifier("\(mode.identifierPrefix)_DescriptionTextField")
-                    }
-                    Section(header: Text("Amount").font(.headline)) {
-                        TextField("Enter amount", text: $amount)
-                            .decimalInput($amount)
-                            .accessibilityIdentifier("\(mode.identifierPrefix)_AmountTextField")
-                    }
-                    Section {
-                        Toggle(isOn: $repeatsEveryDay.animation(.snappy)) {
-                            Label {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text("Every day")
-                                    Text("Add this transaction to all seven days")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            } icon: {
-                                Image(systemName: "repeat.circle.fill")
-                                    .foregroundStyle(FinanceTheme.accent)
+            FinanceEntryForm(
+                descriptionText: $descriptionText,
+                amount: $amount,
+                descriptionPrompt: "Enter description",
+                descriptionIdentifier: "\(mode.identifierPrefix)_DescriptionTextField",
+                amountIdentifier: "\(mode.identifierPrefix)_AmountTextField"
+            ) {
+                VStack(spacing: 16) {
+                    Toggle(isOn: $repeatsEveryDay.animation(.snappy)) {
+                        Label {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Every day")
+                                Text("Add this transaction to all seven days")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
+                        } icon: {
+                            Image(systemName: "repeat.circle.fill")
+                                .foregroundStyle(FinanceTheme.accent)
                         }
-                        .tint(FinanceTheme.accent)
-                        .accessibilityIdentifier("\(mode.identifierPrefix)_EveryDayToggle")
+                    }
+                    .tint(FinanceTheme.accent)
+                    .accessibilityIdentifier("\(mode.identifierPrefix)_EveryDayToggle")
+                    .financeCard(padding: 18)
 
-                        if !repeatsEveryDay {
-                            Picker("Day", selection: $selectedDay) {
-                                ForEach(Weekday.allNames, id: \.self) { day in
-                                    Text(day)
-                                        .accessibilityIdentifier("\(mode.identifierPrefix)_DayPicker_\(day)")
-                                }
-                            }
-                            .pickerStyle(.wheel)
-                            .accessibilityIdentifier("\(mode.identifierPrefix)_DayPicker")
-                        }
-                    } header: {
-                        Text("Schedule").font(.headline)
+                    if !repeatsEveryDay {
+                        WeekdayPickerCard(
+                            selection: $selectedDay,
+                            pickerID: "\(mode.identifierPrefix)_DayPicker"
+                        )
                     }
-                    Section(header: Text("Transaction Type").font(.headline)) {
-                        Picker("Type", selection: $isIncome) {
-                            Text("Income").tag(true)
-                            Text("Expense").tag(false)
-                        }
-                        .pickerStyle(SegmentedPickerStyle())
-                        .accessibilityIdentifier("\(mode.identifierPrefix)_TypePicker")
-                    }
+
+                    TransactionTypePicker(
+                        isIncome: $isIncome,
+                        identifier: "\(mode.identifierPrefix)_TypePicker"
+                    )
+                }
             }
-            .scrollContentBackground(.hidden)
-            .financeBackground()
             .navigationTitle(mode.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

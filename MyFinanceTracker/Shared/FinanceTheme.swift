@@ -1,11 +1,32 @@
 import SwiftUI
+import UIKit
 
 enum FinanceTheme {
     static let accent = Color(red: 0.34, green: 0.33, blue: 0.88)
     static let accentDeep = Color(red: 0.22, green: 0.20, blue: 0.66)
-    static let income = Color(red: 0.08, green: 0.58, blue: 0.43)
-    static let expense = Color(red: 0.88, green: 0.29, blue: 0.34)
-    static let amber = Color(red: 0.92, green: 0.57, blue: 0.16)
+    /// Text and icons. Deeper on a light surface, lighter on a dark one.
+    static let income = Color(uiColor: UIColor { traits in
+        if traits.userInterfaceStyle == .dark {
+            return UIColor(red: 0.55, green: 0.86, blue: 0.70, alpha: 1)
+        }
+        return UIColor(red: 0.02, green: 0.42, blue: 0.28, alpha: 1)
+    })
+    static let expense = Color(uiColor: UIColor { traits in
+        if traits.userInterfaceStyle == .dark {
+            return UIColor(red: 1.00, green: 0.64, blue: 0.66, alpha: 1)
+        }
+        return UIColor(red: 0.70, green: 0.12, blue: 0.18, alpha: 1)
+    })
+    /// Solid button fills, kept deep so white labels stay readable in both modes.
+    static let incomeFill = Color(red: 0.04, green: 0.40, blue: 0.28)
+    static let expenseFill = Color(red: 0.62, green: 0.12, blue: 0.18)
+    static let amber = Color(uiColor: UIColor { traits in
+        if traits.userInterfaceStyle == .dark {
+            return UIColor(red: 0.98, green: 0.74, blue: 0.36, alpha: 1)
+        }
+        return UIColor(red: 0.62, green: 0.36, blue: 0.05, alpha: 1)
+    })
+    static let amberFill = Color(red: 0.55, green: 0.30, blue: 0.04)
     static let canvas = Color(uiColor: .systemGroupedBackground)
     static let surface = Color(uiColor: .secondarySystemGroupedBackground)
     static let field = Color(uiColor: .tertiarySystemGroupedBackground)
@@ -85,11 +106,23 @@ struct FinanceActionButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(tint)
-            .frame(maxWidth: .infinity, minHeight: 50)
-            .background(tint.opacity(configuration.isPressed ? 0.18 : 0.11), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(
+                tint.opacity(configuration.isPressed ? 0.82 : 1),
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+    }
+}
+
+enum FinanceMark {
+    static let income = "arrow.up.circle.fill"
+    static let expense = "arrow.down.circle.fill"
+
+    static func symbol(isIncome: Bool) -> String {
+        isIncome ? income : expense
     }
 }
 

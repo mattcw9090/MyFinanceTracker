@@ -19,25 +19,8 @@ struct SettingsTabView: View {
     var body: some View {
         NavigationStack {
             List {
-                    cloudSection
-                    Section {
-                        HStack(spacing: 14) {
-                            Image(systemName: "wand.and.stars")
-                                .font(.title3)
-                                .foregroundStyle(FinanceTheme.accent)
-                                .frame(width: 42, height: 42)
-                                .background(FinanceTheme.accent.opacity(0.1), in: Circle())
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Make each week effortless")
-                                    .font(.headline)
-                                Text("Build reusable transactions for each week.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 5)
-                    }
                     predefinedGroup
+                    cloudSection
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
@@ -57,19 +40,16 @@ struct SettingsTabView: View {
                     EditButton()
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button {
-                            showingAddPredefinedTransaction = true
-                        } label: {
-                            Label("Add Predefined Transaction", systemImage: "calendar.badge.plus")
-                        }
-                        .accessibilityIdentifier("AddPredefined_SectionHeader")
+                    Button {
+                        showingAddPredefinedTransaction = true
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.title2)
                             .foregroundStyle(FinanceTheme.accent)
+                            .frame(minWidth: 44, minHeight: 44)
                     }
                     .accessibilityIdentifier("Settings_AddMenu")
+                    .accessibilityLabel("Add Predefined Transaction")
                 }
             }
             .sheet(isPresented: $showingAddPredefinedTransaction) {
@@ -90,10 +70,19 @@ struct SettingsTabView: View {
     private var predefinedGroup: some View {
         Section {
             if visiblePredefined.isEmpty {
-                EmptyStateView(
-                    message: "No predefined transactions. Add some to get started.",
-                    imageName: "tray"
-                )
+                VStack(spacing: 8) {
+                    Image(systemName: "wand.and.stars")
+                        .font(.title2)
+                        .foregroundStyle(FinanceTheme.accent)
+                    Text("Make each week effortless")
+                        .font(.headline)
+                    Text("Build reusable transactions for each week.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
             } else {
@@ -160,6 +149,7 @@ struct SettingsTabView: View {
             }
         } header: {
             Text("Predefined Transactions")
+                .accessibilityIdentifier("AddPredefined_SectionHeader")
         }
     }
 
@@ -172,11 +162,15 @@ struct SettingsTabView: View {
     private var cloudSection: some View {
         Section {
             if cloud.isSignedIn {
-                LabeledContent("Account", value: cloud.savedEmail.isEmpty ? "Signed in" : cloud.savedEmail)
-                Button("Sign out", role: .destructive) {
-                    cloud.signOut()
+                HStack(spacing: 12) {
+                    Text(cloud.savedEmail.isEmpty ? "Signed in" : cloud.savedEmail)
+                        .lineLimit(1)
+                    Spacer(minLength: 8)
+                    Button("Sign out", role: .destructive) {
+                        cloud.signOut()
+                    }
+                    .accessibilityIdentifier("Cloud_SignOutButton")
                 }
-                .accessibilityIdentifier("Cloud_SignOutButton")
             } else {
                 TextField("Email", text: $email)
                     .textContentType(.username)
@@ -270,9 +264,11 @@ private struct SettingsTransactionRow: View {
                 Text(desc)
                     .font(.body)
                     .foregroundColor(.primary)
-                Text([isIncome ? "Income" : "Expense", schedule].compactMap { $0 }.joined(separator: " • "))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                if let schedule {
+                    Text(schedule)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
 
             Spacer()

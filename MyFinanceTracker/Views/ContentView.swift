@@ -32,7 +32,8 @@ struct ContentView: View {
         }
         .tint(FinanceTheme.accent)
         .safeAreaInset(edge: .top, spacing: 0) {
-            if let prompt = financeSyncPrompt(isSignedIn: cloud.isSignedIn, notice: cloud.syncNotice) {
+            if !ProcessInfo.processInfo.arguments.contains("-FinanceScreenshots"),
+               let prompt = financeSyncPrompt(isSignedIn: cloud.isSignedIn, notice: cloud.syncNotice) {
                 FinanceSyncPrompt(kind: prompt) {
                     handleSyncPrompt(prompt)
                 }

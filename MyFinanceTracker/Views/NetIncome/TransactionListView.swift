@@ -4,79 +4,89 @@ import SwiftData
 struct TransactionListView: View {
     let day: String
     let transactions: [Transaction]
+    var onOpen: (Transaction) -> Void
 
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var netIncomeManager: NetIncomeManager
 
-    @State private var cashFlowPrompt: CashFlowPrompt?
+    @State private var cashFlowTransaction: Transaction?
+    @State private var showingCashFlowPrompt = false
     @State private var courtCostDraft: CourtCostDraft?
+    @State private var pendingDelete: Transaction?
+    @State private var showingDeleteConfirm = false
     @State private var completionMessage: String?
     @State private var isCompleting = false
 
     var body: some View {
-        Group {
+        List {
             if transactions.isEmpty {
-                ScrollView {
-                    VStack(spacing: 12) {
-                        Image(systemName: "calendar.badge.checkmark")
-                            .font(.system(size: 30, weight: .light))
-                            .foregroundStyle(FinanceTheme.accent)
-                        Text("Nothing planned")
-                            .font(.headline)
-                        Text("Add income or an expense for \(day).")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .financeCard(padding: 28)
-                }
-                .refreshable {
-                    await FinanceCloud.shared.sync(in: modelContext)
-                }
+                Text("Nothing planned")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .accessibilityIdentifier("emptyDay")
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 10) {
-                        ForEach(transactions, id: \.id) { transaction in
-                            NavigationLink(destination: EditTransactionView(transaction: transaction)
-                                            .environmentObject(netIncomeManager)) {
-                                TransactionRowView(
-                                    transaction: transaction,
-                                    onComplete: {
-                                        complete(transaction)
-                                    },
-                                    onDelete: {
-                                        deleteTransaction(transaction)
-                                    }
-                                )
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
+                ForEach(transactions, id: \.id) { transaction in
+                    TransactionRowView(transaction: transaction) {
+                        onOpen(transaction)
+                    } onComplete: {
+                        complete(transaction)
                     }
-                    .padding(.bottom, 24)
-                }
-                .refreshable {
-                    await FinanceCloud.shared.sync(in: modelContext)
+                    .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button(role: .destructive) {
+                            pendingDelete = transaction
+                            showingDeleteConfirm = true
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                        .accessibilityIdentifier("deleteButton")
+                    }
                 }
             }
         }
-        .alert(item: $cashFlowPrompt) { prompt in
-            Alert(
-                title: Text("Add to Cash Flow"),
-                message: Text("Do you want to add this completed income transaction to the 'Who owes me' section?"),
-                primaryButton: .default(Text("Yes")) {
-                    courtCostDraft = CourtCostDraft(transaction: prompt.transaction)
-                },
-                secondaryButton: .cancel {
-                    finish(prompt.transaction, addToCashFlow: false)
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .accessibilityIdentifier("selectedDay")
+        .accessibilityLabel(day)
+        .refreshable {
+            await FinanceCloud.shared.sync(in: modelContext)
+        }
+        .alert(
+            "Add to Cash Flow",
+            isPresented: $showingCashFlowPrompt
+        ) {
+            Button("Tick") {
+                if let transaction = cashFlowTransaction {
+                    applyTickChoice(.tick, to: transaction)
                 }
-            )
+                cashFlowTransaction = nil
+            }
+            Button("Add to who owes me") {
+                if let transaction = cashFlowTransaction {
+                    applyTickChoice(.addToCashFlow, to: transaction)
+                }
+                cashFlowTransaction = nil
+            }
+            Button("Cancel", role: .cancel) {
+                if let transaction = cashFlowTransaction {
+                    applyTickChoice(.cancel, to: transaction)
+                }
+                cashFlowTransaction = nil
+            }
+        } message: {
+            Text("Tick marks it done. Add to who owes me also records what is still owed.")
         }
         .sheet(item: $courtCostDraft) { draft in
             AddCourtCostView(
                 transactionName: draft.transaction.desc ?? "Unnamed Transaction",
                 transactionAmount: draft.transaction.amount,
                 onCancel: {
-                    finish(draft.transaction, addToCashFlow: false)
+                    applyTickChoice(.cancel, to: draft.transaction)
                     courtCostDraft = nil
                 },
                 onAdd: { additionalCost, splitNames in
@@ -91,6 +101,19 @@ struct TransactionListView: View {
             )
             .interactiveDismissDisabled()
         }
+        .alert("Delete this transaction?", isPresented: $showingDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                if let transaction = pendingDelete {
+                    deleteTransaction(transaction)
+                }
+                pendingDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingDelete = nil
+            }
+        } message: {
+            Text("This removes it from the week and updates the balance.")
+        }
         .alert("Couldn't tick this transaction", isPresented: Binding(
             get: { completionMessage != nil },
             set: { if !$0 { completionMessage = nil } }
@@ -103,13 +126,27 @@ struct TransactionListView: View {
 
     private func complete(_ transaction: Transaction) {
         if transaction.isIncome {
-            cashFlowPrompt = CashFlowPrompt(transaction: transaction)
+            cashFlowTransaction = transaction
+            showingCashFlowPrompt = true
         } else {
-            finish(transaction, addToCashFlow: false)
+            applyTickChoice(.tick, to: transaction)
         }
     }
 
-    /// Expenses, No, and Cancel tick the row only. Add also sends the court cost and names.
+    /// Cancel returns before any completion request. Tick completes the row.
+    /// Add to who owes me opens the court-cost sheet, which completes on Add.
+    private func applyTickChoice(_ choice: IncomeTickChoice, to transaction: Transaction) {
+        guard shouldCompleteTransaction(for: choice) else { return }
+        switch choice {
+        case .tick:
+            finish(transaction, addToCashFlow: false)
+        case .addToCashFlow:
+            courtCostDraft = CourtCostDraft(transaction: transaction)
+        case .cancel:
+            break
+        }
+    }
+
     /// Cash-flow items are created in Supabase and arrive on the following pull.
     private func finish(
         _ transaction: Transaction,
@@ -140,12 +177,6 @@ struct TransactionListView: View {
         transaction.markDeleted()
         modelContext.saveOrLog()
     }
-
-}
-
-private struct CashFlowPrompt: Identifiable {
-    let id = UUID()
-    let transaction: Transaction
 }
 
 private struct CourtCostDraft: Identifiable {

@@ -7,46 +7,58 @@ struct NetIncomeBalanceCard: View {
         NavigationLink {
             AdjustNetIncomeView()
         } label: {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Label("NET INCOME", systemImage: "sparkles")
                         .font(.caption.weight(.bold))
-                        .tracking(0.8)
-                        .foregroundStyle(.white.opacity(0.78))
+                        .tracking(0.6)
+                        .foregroundStyle(.white.opacity(0.85))
                         .accessibilityIdentifier("netIncomeLabel")
                     Spacer()
                     Image(systemName: "slider.horizontal.2.square")
-                        .font(.title3)
-                        .foregroundStyle(.white.opacity(0.8))
+                        .font(.body)
+                        .foregroundStyle(.white.opacity(0.85))
                 }
 
                 Text(netIncomeManager.netIncome.formattedAsCurrency())
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .font(.system(.title, design: .rounded, weight: .bold))
                     .foregroundStyle(.white)
                     .monospacedDigit()
                     .contentTransition(.numericText())
                     .animation(.snappy, value: netIncomeManager.netIncome)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
 
-                Text(netIncomeManager.netIncome >= 0 ? "You’re ahead for the week" : "Your planned spending is above income")
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.76))
+                Text(statusLine)
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.88))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(22)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
             .background(
                 LinearGradient(
-                    colors: netIncomeManager.netIncome >= 0
-                        ? [FinanceTheme.accent, FinanceTheme.accentDeep]
-                        : [FinanceTheme.expense, Color(red: 0.58, green: 0.12, blue: 0.25)],
+                    colors: [FinanceTheme.accent, FinanceTheme.accentDeep],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ),
-                in: RoundedRectangle(cornerRadius: 26, style: .continuous)
+                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
             )
-            .shadow(color: FinanceTheme.accent.opacity(0.18), radius: 18, y: 9)
+            .shadow(color: FinanceTheme.accent.opacity(0.18), radius: 12, y: 6)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("netIncomeValue")
         .accessibilityHint("Adjust net income")
+    }
+
+    private var statusLine: String {
+        let value = netIncomeManager.netIncome
+        if abs(value) < 0.005 {
+            return "Even for the week"
+        }
+        if value > 0 {
+            return "You’re ahead for the week"
+        }
+        return "Your planned spending is above income"
     }
 }

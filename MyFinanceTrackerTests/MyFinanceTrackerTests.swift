@@ -66,6 +66,55 @@ struct FinanceSyncTests {
         #expect(FinanceCloudError.needsConnection.errorDescription == "Ticking a transaction needs an internet connection.")
     }
 
+    @Test func cancellingATickDoesNotCompleteTheTransaction() {
+        #expect(shouldCompleteTransaction(for: .cancel) == false)
+        #expect(shouldCompleteTransaction(for: .tick))
+        #expect(shouldCompleteTransaction(for: .addToCashFlow))
+    }
+
+    @Test func initializeWeekBalanceMatchesPredefinedDays() {
+        let rows = [
+            PredefinedWeekRow(amount: 6, isIncome: false, dayOfWeek: "Every day"),
+            PredefinedWeekRow(amount: 28, isIncome: false, dayOfWeek: "Monday"),
+            PredefinedWeekRow(amount: 120, isIncome: true, dayOfWeek: "Wednesday"),
+            PredefinedWeekRow(amount: 80, isIncome: false, dayOfWeek: "Friday"),
+            PredefinedWeekRow(amount: 10, isIncome: true, dayOfWeek: nil),
+            PredefinedWeekRow(amount: 99, isIncome: true, dayOfWeek: "Monday", isDeleted: true)
+        ]
+        // Every day −42, Monday −28, Wednesday +120, Friday −80, missing day +10. Deleted is ignored.
+        #expect(predefinedWeekBalance(rows, unscheduledDay: "Wednesday") == -20)
+    }
+
+    @Test func initializeWeekBalanceIsTheSignedSumEvenWhenItIsZero() {
+        let rows = [
+            PredefinedWeekRow(amount: 10, isIncome: true, dayOfWeek: "Monday"),
+            PredefinedWeekRow(amount: 10, isIncome: false, dayOfWeek: "Tuesday")
+        ]
+        #expect(predefinedWeekBalance(rows, unscheduledDay: "Monday") == 0)
+    }
+
+    @Test func initializeConfirmationUsesThePredefinedTotal() {
+        let rows = [
+            PredefinedWeekRow(amount: 6, isIncome: false, dayOfWeek: "Every day"),
+            PredefinedWeekRow(amount: 28, isIncome: false, dayOfWeek: "Monday"),
+            PredefinedWeekRow(amount: 120, isIncome: true, dayOfWeek: "Wednesday"),
+            PredefinedWeekRow(amount: 80, isIncome: false, dayOfWeek: "Friday")
+        ]
+        let total = predefinedWeekBalance(rows, unscheduledDay: "Wednesday")
+        #expect(total == -30)
+        let message = initializeWeekConfirmationMessage(total: total)
+        #expect(message.contains("replaces this week"))
+        #expect(message.contains("predefined"))
+        #expect(message.contains(total.formattedAsCurrency()))
+        #expect(message.contains("$0.00") == false)
+    }
+
+    @Test func amountFieldsUseTwoDecimalPlaces() {
+        #expect(80.0.amountFieldText() == "80.00")
+        #expect(6.0.amountFieldText() == "6.00")
+        #expect(80.5.amountFieldText() == "80.50")
+    }
+
     @Test func completeRequestTicksWithoutCashFlow() throws {
         let id = try #require(UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"))
         let call = completeFinanceTransactionCall(

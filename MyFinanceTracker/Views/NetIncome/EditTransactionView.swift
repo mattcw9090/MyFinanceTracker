@@ -12,8 +12,6 @@ struct EditTransactionView: View {
     @State private var selectedDay: String
     @State private var isIncome: Bool
 
-    let days = Weekday.allNames
-
     @EnvironmentObject var netIncomeManager: NetIncomeManager
 
     @State private var showAlert = false
@@ -22,50 +20,25 @@ struct EditTransactionView: View {
     init(transaction: Transaction) {
         self.transaction = transaction
         _descriptionText = State(initialValue: transaction.desc ?? "")
-        _amount = State(initialValue: String(transaction.amount))
+        _amount = State(initialValue: transaction.amount.amountFieldText())
         _selectedDay = State(initialValue: transaction.dayOfWeek ?? "Monday")
         _isIncome = State(initialValue: transaction.isIncome)
     }
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section(header: Text("Description").font(.headline)) {
-                    TextField("Enter description", text: $descriptionText)
-                        .padding(.vertical, 8)
-                        .accessibilityIdentifier("descriptionField")
-                }
-
-                Section(header: Text("Amount").font(.headline)) {
-                    TextField("Enter amount", text: $amount)
-                        .decimalInput($amount)
-                        .padding(.vertical, 8)
-                        .accessibilityIdentifier("amountField")
-                }
-
-                Section(header: Text("Day of the Week").font(.headline)) {
-                    Picker("Select Day", selection: $selectedDay) {
-                        ForEach(days, id: \.self) { day in
-                            Text(day)
-                        }
-                    }
-                    .pickerStyle(WheelPickerStyle())
-                    .frame(height: 150)
-                    .accessibilityIdentifier("EditTransaction_DayPicker")
-                }
-
-                Section(header: Text("Transaction Type").font(.headline)) {
-                    Picker("Type", selection: $isIncome) {
-                        Text("Income").tag(true)
-                        Text("Expense").tag(false)
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                    .tint(.accentColor)
-                    .accessibilityIdentifier("editTransactionTypePicker")
+            FinanceEntryForm(
+                descriptionText: $descriptionText,
+                amount: $amount,
+                descriptionPrompt: "Enter description",
+                descriptionIdentifier: "descriptionField",
+                amountIdentifier: "amountField"
+            ) {
+                VStack(spacing: 16) {
+                    WeekdayPickerCard(selection: $selectedDay, pickerID: "EditTransaction_DayPicker")
+                    TransactionTypePicker(isIncome: $isIncome, identifier: "editTransactionTypePicker")
                 }
             }
-            .scrollContentBackground(.hidden)
-            .financeBackground()
             .navigationTitle("Edit Transaction")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -107,7 +80,6 @@ struct EditTransactionView: View {
         transaction.isIncome = isIncome
         transaction.markLocalEdit()
 
-        // Adjust net income
         netIncomeManager.adjustNetIncome(by: oldAmount, isIncome: wasIncome, isDeletion: true)
         netIncomeManager.adjustNetIncome(by: newAmount, isIncome: isIncome, isDeletion: false)
 

@@ -89,7 +89,7 @@ struct ImportSessionsView: View {
                 Task { await showWeek(PerthWeek.addingWeeks(-1, to: weekStart)) }
             } label: {
                 Image(systemName: "chevron.left")
-                    .frame(width: 32, height: 32)
+                    .frame(minWidth: 44, minHeight: 44)
             }
             .disabled(isLoading || isImporting)
             .accessibilityIdentifier("ImportSessions_PreviousWeek")
@@ -110,7 +110,7 @@ struct ImportSessionsView: View {
                 Task { await showWeek(PerthWeek.addingWeeks(1, to: weekStart)) }
             } label: {
                 Image(systemName: "chevron.right")
-                    .frame(width: 32, height: 32)
+                    .frame(minWidth: 44, minHeight: 44)
             }
             .disabled(isLoading || isImporting)
             .accessibilityIdentifier("ImportSessions_NextWeek")

@@ -8,15 +8,15 @@ struct CashFlowFormFields: View {
     var body: some View {
         VStack(spacing: 18) {
             formField(title: "Name", icon: "person", text: $name, keyboardType: .default)
-            formField(title: "Amount", icon: "dollarsign.circle", text: $amount, keyboardType: .decimalPad)
+            amountField
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Cash Flow Type")
                     .font(.headline)
                     .foregroundStyle(.primary)
                 Picker("Type", selection: $isOwedToMe) {
-                    Label("Owed to Me", systemImage: "arrow.down.circle.fill").tag(true)
-                    Label("I Owe", systemImage: "arrow.up.circle.fill").tag(false)
+                    Label("Owed to Me", systemImage: FinanceMark.income).tag(true)
+                    Label("I Owe", systemImage: FinanceMark.expense).tag(false)
                 }
                 .pickerStyle(.segmented)
                 .tint(FinanceTheme.accent)
@@ -24,6 +24,16 @@ struct CashFlowFormFields: View {
             }
         }
         .financeCard(padding: 18)
+    }
+
+    private var amountField: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Amount")
+                .font(.headline)
+                .foregroundStyle(.primary)
+            CurrencyAmountField(amount: $amount, identifier: "cashFlowAmountField")
+                .financeField()
+        }
     }
 
     @ViewBuilder

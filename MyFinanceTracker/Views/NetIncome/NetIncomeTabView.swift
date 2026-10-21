@@ -6,8 +6,21 @@ struct NetIncomeTabView: View {
     @EnvironmentObject var netIncomeManager: NetIncomeManager
 
     enum ActiveAlert: Identifiable {
-        case reset, initializeWeek, success, noPredefinedTransactions
-        var id: Int { hashValue }
+        case reset
+        case initializeWeek(Double)
+        case resetSuccess
+        case initializeSuccess
+        case noPredefinedTransactions
+
+        var id: String {
+            switch self {
+            case .reset: return "reset"
+            case .initializeWeek: return "initializeWeek"
+            case .resetSuccess: return "resetSuccess"
+            case .initializeSuccess: return "initializeSuccess"
+            case .noPredefinedTransactions: return "noPredefinedTransactions"
+            }
+        }
     }
 
     let days = Weekday.allNames
@@ -16,9 +29,12 @@ struct NetIncomeTabView: View {
     @State private var showingAddExpense = false
     @State private var showingImportSessions = false
     @State private var selectedDay: String = Weekday.today
+    @State private var editingTransactionID: UUID?
     @State private var activeAlert: ActiveAlert?
     @State private var weekErrorMessage: String?
     @State private var showWeekError = false
+
+    @ScaledMetric(relativeTo: .caption) private var chipMinHeight: CGFloat = 44
 
     @Query(sort: \Transaction.dayOfWeek, animation: .default)
     private var transactions: [Transaction]
@@ -26,81 +42,64 @@ struct NetIncomeTabView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                    NetIncomeBalanceCard()
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-                        .padding(.bottom, 14)
+                Text(weekRange)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 2)
+                    .accessibilityIdentifier("weekDateRange")
 
-                    HStack(spacing: 12) {
-                        Button(action: { showingAddIncome.toggle() }) {
-                            Label("Income", systemImage: "plus")
-                        }
-                        .buttonStyle(FinanceActionButtonStyle(tint: FinanceTheme.income))
-                        .accessibilityIdentifier("addIncomeButton")
-                        .sheet(isPresented: $showingAddIncome) {
-                            AddTransactionView(isIncome: true, selectedDay: $selectedDay)
-                                .environmentObject(netIncomeManager)
-                        }
-
-                        Button(action: { showingAddExpense.toggle() }) {
-                            Label("Expense", systemImage: "minus")
-                        }
-                        .buttonStyle(FinanceActionButtonStyle(tint: FinanceTheme.expense))
-                        .accessibilityIdentifier("addExpenseButton")
-                        .sheet(isPresented: $showingAddExpense) {
-                            AddTransactionView(isIncome: false, selectedDay: $selectedDay)
-                                .environmentObject(netIncomeManager)
-                        }
-                    }
+                NetIncomeBalanceCard()
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 14)
+                    .padding(.top, 8)
+                    .padding(.bottom, 10)
 
-                    daySelector
-
-                    TabView(selection: $selectedDay) {
-                        ForEach(days, id: \.self) { day in
-                            VStack(alignment: .leading, spacing: 12) {
-                                FinanceSectionLabel(
-                                    title: day,
-                                    detail: transactionSummary(for: day)
-                                )
-                                    .accessibilityIdentifier("selectedDay")
-
-                                TransactionListView(day: day, transactions: transactionsForDay(day))
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.top, 16)
-                            .tag(day)
-                        }
+                HStack(spacing: 10) {
+                    Button(action: { showingAddIncome.toggle() }) {
+                        Label("Income", systemImage: FinanceMark.income)
                     }
-                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .buttonStyle(FinanceActionButtonStyle(tint: FinanceTheme.incomeFill))
+                    .accessibilityIdentifier("addIncomeButton")
+                    .sheet(isPresented: $showingAddIncome) {
+                        AddTransactionView(isIncome: true, selectedDay: $selectedDay)
+                            .environmentObject(netIncomeManager)
+                    }
+
+                    Button(action: { showingAddExpense.toggle() }) {
+                        Label("Expense", systemImage: FinanceMark.expense)
+                    }
+                    .buttonStyle(FinanceActionButtonStyle(tint: FinanceTheme.expenseFill))
+                    .accessibilityIdentifier("addExpenseButton")
+                    .sheet(isPresented: $showingAddExpense) {
+                        AddTransactionView(isIncome: false, selectedDay: $selectedDay)
+                            .environmentObject(netIncomeManager)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 10)
+
+                daySelector
+                    .padding(.bottom, 4)
+
+                TransactionListView(
+                    day: selectedDay,
+                    transactions: transactionsForDay(selectedDay),
+                    onOpen: { editingTransactionID = $0.id }
+                )
             }
             .financeBackground()
             .navigationTitle("My Week")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    HStack(spacing: 20) {
-                        Button { activeAlert = .reset } label: {
-                            Image(systemName: "arrow.counterclockwise")
-                                .foregroundStyle(FinanceTheme.expense)
-                        }
-                        .accessibilityIdentifier("resetButton")
-
-                        Button { activeAlert = .initializeWeek } label: {
-                            Image(systemName: "calendar.badge.plus")
-                                .foregroundStyle(FinanceTheme.accent)
-                        }
-                        .accessibilityIdentifier("initializeWeekButton")
-                    }
-                }
-
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showingImportSessions = true } label: {
-                        Image(systemName: "square.and.arrow.down")
-                            .foregroundStyle(FinanceTheme.accent)
-                    }
-                    .accessibilityIdentifier("importSessionsButton")
+                    weekMenu
+                }
+            }
+            .navigationDestination(isPresented: editingPresented) {
+                if let transaction = transactions.first(where: { $0.id == editingTransactionID && $0.deletedAt == nil }) {
+                    EditTransactionView(transaction: transaction)
+                        .environmentObject(netIncomeManager)
                 }
             }
             .sheet(isPresented: $showingImportSessions) {
@@ -115,17 +114,23 @@ struct NetIncomeTabView: View {
                         primaryButton: .destructive(Text("Reset")) { resetAll() },
                         secondaryButton: .cancel()
                     )
-                case .initializeWeek:
+                case .initializeWeek(let total):
                     return Alert(
                         title: Text("Confirm Initialize Week"),
-                        message: Text("This will delete all existing transactions and reset net income to $0.00."),
+                        message: Text(initializeWeekConfirmationMessage(total: total)),
                         primaryButton: .destructive(Text("Initialize")) { initializeWeek() },
                         secondaryButton: .cancel()
                     )
-                case .success:
+                case .resetSuccess:
                     return Alert(
                         title: Text("Operation Successful"),
                         message: Text("All transactions have been deleted and net income has been reset."),
+                        dismissButton: .default(Text("OK")) { activeAlert = nil }
+                    )
+                case .initializeSuccess:
+                    return Alert(
+                        title: Text("Operation Successful"),
+                        message: Text("This week now matches your predefined transactions."),
                         dismissButton: .default(Text("OK")) { activeAlert = nil }
                     )
                 case .noPredefinedTransactions:
@@ -144,46 +149,79 @@ struct NetIncomeTabView: View {
         }
     }
 
-    private func transactionsForDay(_ day: String) -> [Transaction] {
-        transactions.filter { $0.dayOfWeek == day && !$0.isCompleted && $0.deletedAt == nil }
+    private var weekRange: String {
+        PerthWeek.label(for: PerthWeek.monday(containing: .now))
+    }
+
+    private var editingPresented: Binding<Bool> {
+        Binding(
+            get: { editingTransactionID != nil },
+            set: { if !$0 { editingTransactionID = nil } }
+        )
+    }
+
+    private var weekMenu: some View {
+        Menu {
+            Button(role: .destructive) {
+                activeAlert = .reset
+            } label: {
+                Label("Reset Week", systemImage: "arrow.counterclockwise")
+            }
+            .accessibilityIdentifier("resetButton")
+
+            Button {
+                confirmInitialize()
+            } label: {
+                Label("Initialize Week", systemImage: "calendar.badge.plus")
+            }
+            .accessibilityIdentifier("initializeWeekButton")
+
+            Button {
+                showingImportSessions = true
+            } label: {
+                Label("Import Sessions", systemImage: "square.and.arrow.down")
+            }
+            .accessibilityIdentifier("importSessionsButton")
+        } label: {
+            Label("Week", systemImage: "ellipsis.circle")
+        }
+        .accessibilityIdentifier("weekActionsMenu")
     }
 
     private var daySelector: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(days, id: \.self) { day in
-                        Button {
-                            withAnimation(.snappy) { selectedDay = day }
-                        } label: {
-                            VStack(spacing: 4) {
-                                Text(String(day.prefix(1)))
-                                    .font(.caption.weight(.semibold))
-                                Text(day == Weekday.today ? "Today" : String(day.prefix(3)))
-                                    .font(.caption2.weight(.medium))
-                            }
-                            .foregroundStyle(selectedDay == day ? .white : .secondary)
-                            .frame(width: 54, height: 48)
-                            .background(
-                                selectedDay == day ? FinanceTheme.accent : FinanceTheme.surface,
-                                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .id(day)
+        HStack(spacing: 4) {
+            ForEach(days, id: \.self) { day in
+                let isSelected = selectedDay == day
+                Button {
+                    withAnimation(.snappy) { selectedDay = day }
+                } label: {
+                    VStack(spacing: 3) {
+                        Text(String(day.prefix(3)))
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                        Circle()
+                            .fill(day == Weekday.today ? (isSelected ? Color.white : FinanceTheme.accent) : Color.clear)
+                            .frame(width: 5, height: 5)
                     }
+                    .foregroundStyle(isSelected ? Color.white : Color.primary)
+                    .frame(maxWidth: .infinity, minHeight: chipMinHeight)
+                    .background(
+                        isSelected ? FinanceTheme.accent : FinanceTheme.surface,
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    )
                 }
-                .padding(.horizontal, 16)
-            }
-            .onChange(of: selectedDay) { _, day in
-                withAnimation(.snappy) { proxy.scrollTo(day, anchor: .center) }
+                .buttonStyle(.plain)
+                .accessibilityLabel(day)
+                .accessibilityValue(day == Weekday.today ? "Today" : "")
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
+        .padding(.horizontal, 12)
     }
 
-    private func transactionSummary(for day: String) -> String {
-        let count = transactionsForDay(day).count
-        return count == 1 ? "1 planned item" : "\(count) planned items"
+    private func transactionsForDay(_ day: String) -> [Transaction] {
+        transactions.filter { $0.dayOfWeek == day && !$0.isCompleted && $0.deletedAt == nil }
     }
 
     private func resetAll() {
@@ -193,7 +231,22 @@ struct NetIncomeTabView: View {
     private func resetWeekOnline() async {
         do {
             try await FinanceCloud.shared.resetFinanceWeek(in: modelContext)
-            activeAlert = .success
+            activeAlert = .resetSuccess
+        } catch {
+            weekErrorMessage = error.localizedDescription
+            showWeekError = true
+        }
+    }
+
+    private func confirmInitialize() {
+        do {
+            let rows = try livePredefinedRows()
+            guard !rows.isEmpty else {
+                activeAlert = .noPredefinedTransactions
+                return
+            }
+            let total = predefinedWeekBalance(rows, unscheduledDay: Weekday.today)
+            activeAlert = .initializeWeek(total)
         } catch {
             weekErrorMessage = error.localizedDescription
             showWeekError = true
@@ -202,9 +255,8 @@ struct NetIncomeTabView: View {
 
     private func initializeWeek() {
         do {
-            let predefined = try modelContext.fetch(FetchDescriptor<PredefinedTransaction>())
-                .filter { $0.deletedAt == nil }
-            guard !predefined.isEmpty else {
+            let rows = try livePredefinedRows()
+            guard !rows.isEmpty else {
                 activeAlert = .noPredefinedTransactions
                 return
             }
@@ -216,13 +268,26 @@ struct NetIncomeTabView: View {
         Task { await initializeWeekOnline() }
     }
 
+    private func livePredefinedRows() throws -> [PredefinedWeekRow] {
+        try modelContext.fetch(FetchDescriptor<PredefinedTransaction>())
+            .filter { $0.deletedAt == nil }
+            .map {
+                PredefinedWeekRow(
+                    amount: $0.amount,
+                    isIncome: $0.isIncome,
+                    dayOfWeek: $0.dayOfWeek,
+                    isDeleted: false
+                )
+            }
+    }
+
     private func initializeWeekOnline() async {
         do {
             try await FinanceCloud.shared.reinitializeFinanceWeek(
                 unscheduledDay: Weekday.today,
                 in: modelContext
             )
-            activeAlert = .success
+            activeAlert = .initializeSuccess
         } catch {
             weekErrorMessage = error.localizedDescription
             showWeekError = true

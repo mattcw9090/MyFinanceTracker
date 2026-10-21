@@ -11,8 +11,6 @@ struct AddTransactionView: View {
     @State private var descriptionText = ""
     @State private var amount = ""
 
-    let days = Weekday.allNames
-
     @EnvironmentObject var netIncomeManager: NetIncomeManager
 
     @State private var showAlert = false
@@ -20,65 +18,26 @@ struct AddTransactionView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        FinanceSectionLabel(title: "When", detail: selectedDay)
-                        Picker("Select Day", selection: $selectedDay) {
-                            ForEach(days, id: \.self) { day in
-                                Text(day)
-                            }
-                        }
-                        .pickerStyle(.wheel)
-                        .frame(height: 128)
-                        .accessibilityIdentifier("AddTransaction_DayPicker")
-                    }
-                    .financeCard(padding: 18)
-
-                    VStack(alignment: .leading, spacing: 16) {
-                        FinanceSectionLabel(title: isIncome ? "Income details" : "Expense details")
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Description").font(.subheadline.weight(.semibold))
-                            TextField(isIncome ? "e.g. Pay" : "e.g. Groceries", text: $descriptionText)
-                                .financeField()
-                                .textInputAutocapitalization(.sentences)
-                                .accessibilityIdentifier("descriptionField")
-                        }
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Amount").font(.subheadline.weight(.semibold))
-                            HStack(spacing: 10) {
-                                Text("$")
-                                    .font(.headline)
-                                    .foregroundStyle(.secondary)
-                                TextField("0.00", text: $amount)
-                                    .decimalInput($amount)
-                                    .accessibilityIdentifier("amountField")
-                            }
-                            .financeField()
-                        }
-                    }
-                    .financeCard(padding: 18)
-
-                    Button(action: addTransaction) {
-                        Text(isIncome ? "Add Income" : "Add Expense")
-                    }
-                    .buttonStyle(FinancePrimaryButtonStyle())
-                    .disabled(!isFormValid())
-                    .opacity(isFormValid() ? 1 : 0.45)
-                    .accessibilityIdentifier("saveButton")
-                }
-                .padding(16)
-                .padding(.bottom, 24)
+            FinanceEntryForm(
+                descriptionText: $descriptionText,
+                amount: $amount,
+                descriptionPrompt: isIncome ? "e.g. Pay" : "e.g. Groceries",
+                descriptionIdentifier: "descriptionField",
+                amountIdentifier: "amountField"
+            ) {
+                WeekdayPickerCard(selection: $selectedDay, pickerID: "AddTransaction_DayPicker")
             }
-            .financeBackground()
             .navigationTitle(isIncome ? "Add Income" : "Add Expense")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
                         .accessibilityIdentifier("cancelButton")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") { addTransaction() }
+                        .disabled(!isFormValid())
+                        .accessibilityIdentifier("saveButton")
                 }
             }
             .alert(isPresented: $showAlert) {
