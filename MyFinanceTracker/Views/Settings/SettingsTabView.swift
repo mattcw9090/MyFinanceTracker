@@ -245,17 +245,6 @@ struct SettingsTabView: View {
         Section {
             if cloud.isSignedIn {
                 LabeledContent("Account", value: cloud.savedEmail.isEmpty ? "Signed in" : cloud.savedEmail)
-                Button {
-                    Task { await cloud.sync(in: modelContext) }
-                } label: {
-                    if cloud.isBusy {
-                        ProgressView()
-                    } else {
-                        Text("Sync now")
-                    }
-                }
-                .disabled(cloud.isBusy)
-                .accessibilityIdentifier("Cloud_SyncButton")
                 Button("Sign out", role: .destructive) {
                     cloud.signOut()
                 }
@@ -283,15 +272,15 @@ struct SettingsTabView: View {
                 .disabled(cloud.isBusy || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.isEmpty)
                 .accessibilityIdentifier("Cloud_SignInButton")
             }
-            if let statusMessage = cloud.statusMessage {
+            if !cloud.isSignedIn, let statusMessage = cloud.statusMessage {
                 Text(statusMessage)
                     .font(.footnote)
-                    .foregroundStyle(statusMessage.hasPrefix("Sync") || statusMessage == "Signed in." || statusMessage.hasPrefix("Signed out") ? .secondary : FinanceTheme.expense)
+                    .foregroundStyle(FinanceTheme.expense)
             }
         } header: {
             Text("Cloud")
         } footer: {
-            Text("Uses the same sign-in as CoachPlanner. This phone keeps its own copy and syncs when you open the app or pull to refresh. Signing out leaves that copy here.")
+            Text("Uses the same sign-in as CoachPlanner. This phone keeps its own copy. Signing out leaves that copy here.")
         }
     }
 

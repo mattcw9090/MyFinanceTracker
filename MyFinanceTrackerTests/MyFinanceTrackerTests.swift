@@ -226,6 +226,101 @@ struct FinanceSyncTests {
         #expect(transactions[0].coachingWeekStart == nil)
     }
 
+    @Test func offlineSyncStaysSilent() {
+        let offline = URLError(.notConnectedToInternet)
+        let first = nextFinanceSyncNotice(isSignedIn: true, error: offline, consecutiveFailures: 0, current: nil)
+        #expect(first.notice == nil)
+        #expect(first.consecutiveFailures == 0)
+
+        let duringRetries = nextFinanceSyncNotice(isSignedIn: true, error: offline, consecutiveFailures: 2, current: nil)
+        #expect(duringRetries.notice == nil)
+        #expect(duringRetries.consecutiveFailures == 2)
+
+        let kept = nextFinanceSyncNotice(
+            isSignedIn: true,
+            error: URLError(.timedOut),
+            consecutiveFailures: 3,
+            current: .uploadsNotSending
+        )
+        #expect(kept.notice == .uploadsNotSending)
+        #expect(financeSyncPrompt(isSignedIn: true, notice: nil) == nil)
+    }
+
+    @Test func uploadFailuresPromptOnlyAfterTheyRepeat() {
+        let error = FinanceCloudError.requestFailed("500")
+        var failures = 0
+        var notice: FinanceSyncNotice?
+        for _ in 1...2 {
+            let step = nextFinanceSyncNotice(
+                isSignedIn: true,
+                error: error,
+                consecutiveFailures: failures,
+                current: notice
+            )
+            failures = step.consecutiveFailures
+            notice = step.notice
+            #expect(notice == nil)
+        }
+        let third = nextFinanceSyncNotice(
+            isSignedIn: true,
+            error: error,
+            consecutiveFailures: failures,
+            current: notice
+        )
+        #expect(third.consecutiveFailures == 3)
+        #expect(third.notice == .uploadsNotSending)
+        #expect(financeSyncPrompt(isSignedIn: true, notice: third.notice) == .uploadsNotSending)
+
+        let success = nextFinanceSyncNotice(
+            isSignedIn: true,
+            error: nil,
+            consecutiveFailures: third.consecutiveFailures,
+            current: third.notice
+        )
+        #expect(success.notice == nil)
+        #expect(success.consecutiveFailures == 0)
+        #expect(financeSyncPrompt(isSignedIn: true, notice: success.notice) == nil)
+    }
+
+    @Test func signedOutAndBlockedAccountPromptImmediately() {
+        #expect(financeSyncPrompt(isSignedIn: false, notice: nil) == .signIn)
+        let expired = nextFinanceSyncNotice(
+            isSignedIn: true,
+            error: FinanceCloudError.notSignedIn,
+            consecutiveFailures: 4,
+            current: .uploadsNotSending
+        )
+        #expect(expired.notice == .needsSignIn)
+        #expect(expired.consecutiveFailures == 0)
+        #expect(financeSyncPrompt(isSignedIn: true, notice: expired.notice) == .signIn)
+
+        let signedOut = nextFinanceSyncNotice(
+            isSignedIn: false,
+            error: FinanceCloudError.notSignedIn,
+            consecutiveFailures: 4,
+            current: .uploadsNotSending
+        )
+        #expect(signedOut.notice == nil)
+        #expect(financeSyncPrompt(isSignedIn: false, notice: signedOut.notice) == .signIn)
+
+        let blocked = nextFinanceSyncNotice(
+            isSignedIn: true,
+            error: FinanceCloudError.workspaceUnavailable,
+            consecutiveFailures: 0,
+            current: nil
+        )
+        #expect(blocked.notice == .accountBlocked)
+        #expect(financeSyncPrompt(isSignedIn: true, notice: blocked.notice) == .accountBlocked)
+
+        let stillBlocked = nextFinanceSyncNotice(
+            isSignedIn: true,
+            error: FinanceCloudError.requestFailed("500"),
+            consecutiveFailures: blocked.consecutiveFailures,
+            current: blocked.notice
+        )
+        #expect(stillBlocked.notice == .accountBlocked)
+    }
+
     @Test func importingNeedsAConnectionBeforeAnyRequest() {
         #expect(shouldImportSessionsOnline(isSignedIn: false, isOnline: true) == false)
         #expect(shouldImportSessionsOnline(isSignedIn: true, isOnline: false) == false)

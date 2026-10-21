@@ -17,7 +17,11 @@ final class FinanceCloud: ObservableObject {
     @Published private(set) var isSignedIn = false
     @Published private(set) var isBusy = false
     @Published private(set) var statusMessage: String?
+    /// Set only when sync needs a person: sign-in, a blocked account, or uploads that keep failing.
+    @Published private(set) var syncNotice: FinanceSyncNotice?
     @Published private(set) var savedEmail: String
+
+    private var consecutiveUploadFailures = 0
 
     private let keychain = FinanceKeychain()
     private let defaults: UserDefaults
@@ -48,7 +52,9 @@ final class FinanceCloud: ObservableObject {
             defaults.set(email, forKey: FinanceCloudConfiguration.emailDefaultsKey)
             savedEmail = email
             isSignedIn = true
-            statusMessage = "Signed in."
+            statusMessage = nil
+            consecutiveUploadFailures = 0
+            syncNotice = nil
         } catch {
             accessToken = nil
             keychain.delete("access_token")
@@ -63,7 +69,9 @@ final class FinanceCloud: ObservableObject {
         tokenRefreshTask = nil
         accessToken = nil
         isSignedIn = false
-        statusMessage = "Signed out. The copy on this phone is unchanged."
+        statusMessage = nil
+        consecutiveUploadFailures = 0
+        syncNotice = nil
         keychain.delete("access_token")
         keychain.delete("refresh_token")
     }
@@ -84,9 +92,22 @@ final class FinanceCloud: ObservableObject {
 
         do {
             try await performSync(in: context)
+            recordSyncResult(nil)
         } catch {
-            statusMessage = error.localizedDescription
+            recordSyncResult(error)
         }
+    }
+
+    /// Records whether this attempt needs a prompt. Does not change which rows were saved.
+    private func recordSyncResult(_ error: Error?) {
+        let next = nextFinanceSyncNotice(
+            isSignedIn: isSignedIn,
+            error: error,
+            consecutiveFailures: consecutiveUploadFailures,
+            current: syncNotice
+        )
+        consecutiveUploadFailures = next.consecutiveFailures
+        syncNotice = next.notice
     }
 
     /// Ticks one transaction in Supabase. Local completion and cash-flow rows
@@ -208,34 +229,11 @@ final class FinanceCloud: ObservableObject {
         NetIncomeManager.shared.flushPendingSave()
         let token = try await validAccessToken()
         try await verifyWorkspaceAccess(token: token)
-        var uploaded = 0
-        var downloaded = 0
-
-        let cashFlow = try await syncCashFlow(token: token, context: context)
-        uploaded += cashFlow.uploaded
-        downloaded += cashFlow.downloaded
-
-        let predefined = try await syncPredefined(token: token, context: context)
-        uploaded += predefined.uploaded
-        downloaded += predefined.downloaded
-
-        let quickAdd = try await syncQuickAdd(token: token, context: context)
-        uploaded += quickAdd.uploaded
-        downloaded += quickAdd.downloaded
-
-        let transactions = try await syncTransactions(token: token, context: context)
-        uploaded += transactions.uploaded
-        downloaded += transactions.downloaded
-
-        let income = try await syncNetIncome(token: token, context: context)
-        uploaded += income.uploaded
-        downloaded += income.downloaded
-
-        if uploaded == 0 && downloaded == 0 {
-            statusMessage = "Cloud data is up to date."
-        } else {
-            statusMessage = "Sync complete: \(uploaded) uploaded, \(downloaded) downloaded."
-        }
+        _ = try await syncCashFlow(token: token, context: context)
+        _ = try await syncPredefined(token: token, context: context)
+        _ = try await syncQuickAdd(token: token, context: context)
+        _ = try await syncTransactions(token: token, context: context)
+        _ = try await syncNetIncome(token: token, context: context)
     }
 
     private func pushTransactionIfNeeded(_ transaction: Transaction, context: ModelContext) async throws {
@@ -720,7 +718,6 @@ final class FinanceCloud: ObservableObject {
                message.localizedCaseInsensitiveContains("invalid")
                 || message.localizedCaseInsensitiveContains("grant") {
                 signOut()
-                statusMessage = FinanceCloudError.notSignedIn.localizedDescription
             }
             throw error
         }

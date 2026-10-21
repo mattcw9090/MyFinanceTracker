@@ -104,6 +104,78 @@ func shouldImportSessionsOnline(isSignedIn: Bool, isOnline: Bool) -> Bool {
     isSignedIn && isOnline
 }
 
+/// Something the phone cannot finish by retrying on its own.
+enum FinanceSyncNotice: Equatable {
+    case needsSignIn
+    case accountBlocked
+    case uploadsNotSending
+}
+
+enum FinanceSyncPromptKind: Equatable {
+    case signIn
+    case accountBlocked
+    case uploadsNotSending
+}
+
+/// Offline blips stay quiet. A prompt appears on the third failure that is not a network drop.
+let financeUploadFailurePromptThreshold = 3
+
+func financeSyncPrompt(isSignedIn: Bool, notice: FinanceSyncNotice?) -> FinanceSyncPromptKind? {
+    if !isSignedIn || notice == .needsSignIn { return .signIn }
+    switch notice {
+    case .accountBlocked:
+        return .accountBlocked
+    case .uploadsNotSending:
+        return .uploadsNotSending
+    case .needsSignIn, nil:
+        return nil
+    }
+}
+
+func isTransientFinanceSyncError(_ error: Error) -> Bool {
+    guard let urlError = error as? URLError else { return false }
+    switch urlError.code {
+    case .notConnectedToInternet, .networkConnectionLost, .timedOut,
+         .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed,
+         .dataNotAllowed, .internationalRoamingOff, .cancelled:
+        return true
+    default:
+        return false
+    }
+}
+
+/// Updates the attention flag after one sync attempt. A nil error means that attempt succeeded.
+func nextFinanceSyncNotice(
+    isSignedIn: Bool,
+    error: Error?,
+    consecutiveFailures: Int,
+    current: FinanceSyncNotice?
+) -> (notice: FinanceSyncNotice?, consecutiveFailures: Int) {
+    if !isSignedIn {
+        return (nil, 0)
+    }
+    guard let error else {
+        return (nil, 0)
+    }
+    if let cloud = error as? FinanceCloudError, case .notSignedIn = cloud {
+        return (.needsSignIn, 0)
+    }
+    if let cloud = error as? FinanceCloudError, case .workspaceUnavailable = cloud {
+        return (.accountBlocked, consecutiveFailures)
+    }
+    if isTransientFinanceSyncError(error) {
+        return (current, consecutiveFailures)
+    }
+    if current == .needsSignIn || current == .accountBlocked {
+        return (current, consecutiveFailures)
+    }
+    let failures = consecutiveFailures + 1
+    if failures >= financeUploadFailurePromptThreshold {
+        return (.uploadsNotSending, failures)
+    }
+    return (nil, failures)
+}
+
 struct CoachingSessionPreview: Decodable, Identifiable, Equatable {
     let sessionID: UUID
     let weekStart: Date
