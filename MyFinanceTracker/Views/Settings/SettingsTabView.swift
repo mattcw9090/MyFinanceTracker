@@ -5,7 +5,6 @@ struct SettingsTabView: View {
     @Environment(\.modelContext) private var modelContext
 
     @Query(sort: \PredefinedTransaction.dayOfWeek) private var predefinedTransactions: [PredefinedTransaction]
-    @Query(sort: \QuickAddTransaction.desc) private var quickAddTransactions: [QuickAddTransaction]
     @ObservedObject private var cloud = FinanceCloud.shared
 
     @State private var email = ""
@@ -14,8 +13,6 @@ struct SettingsTabView: View {
     @State private var showingAddPredefinedTransaction = false
     @State private var predefinedTransactionToEdit: PredefinedTransaction?
     @State private var predefinedTransactionToDuplicate: PredefinedTransaction?
-    @State private var showingAddQuickAddTransaction = false
-    @State private var quickAddTransactionToEdit: QuickAddTransaction?
 
     let daysOfWeek = Weekday.allNames
 
@@ -33,7 +30,7 @@ struct SettingsTabView: View {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Make each week effortless")
                                     .font(.headline)
-                                Text("Build reusable transactions and quick shortcuts.")
+                                Text("Build reusable transactions for each week.")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -41,7 +38,6 @@ struct SettingsTabView: View {
                         .padding(.vertical, 5)
                     }
                     predefinedGroup
-                    quickAddGroup
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
@@ -68,13 +64,6 @@ struct SettingsTabView: View {
                             Label("Add Predefined Transaction", systemImage: "calendar.badge.plus")
                         }
                         .accessibilityIdentifier("AddPredefined_SectionHeader")
-
-                        Button {
-                            showingAddQuickAddTransaction = true
-                        } label: {
-                            Label("Add Quick Add Transaction", systemImage: "bolt.fill")
-                        }
-                        .accessibilityIdentifier("AddQuickAdd_SectionHeader")
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.title2)
@@ -91,12 +80,6 @@ struct SettingsTabView: View {
             }
             .sheet(item: $predefinedTransactionToDuplicate) { transaction in
                 DuplicatePredefinedTransactionView(source: transaction)
-            }
-            .sheet(isPresented: $showingAddQuickAddTransaction) {
-                QuickAddTransactionFormView(mode: .add)
-            }
-            .sheet(item: $quickAddTransactionToEdit) { transaction in
-                QuickAddTransactionFormView(mode: .edit(transaction))
             }
         }
     }
@@ -180,65 +163,10 @@ struct SettingsTabView: View {
         }
     }
 
-    // MARK: - Quick Add Group
-
-    @ViewBuilder
-    private var quickAddGroup: some View {
-        Section {
-            if visibleQuickAdd.isEmpty {
-                EmptyStateView(
-                    message: "No quick add transactions. Add some to get started.",
-                    imageName: "plus.circle"
-                )
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-            } else {
-                let income = visibleQuickAdd.filter { $0.isIncome }
-                let expense = visibleQuickAdd.filter { !$0.isIncome }
-
-                if !income.isEmpty {
-                    SectionSubHeader(text: "Income", tint: FinanceTheme.income)
-
-                    ForEach(income, id: \.id) { transaction in
-                        QuickAddTransactionRow(transaction: transaction)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                quickAddTransactionToEdit = transaction
-                            }
-                    }
-                    .onDelete { offsets in
-                        deleteQuickAddTransaction(offsets: offsets, from: income)
-                    }
-                }
-
-                if !expense.isEmpty {
-                    SectionSubHeader(text: "Expense", tint: FinanceTheme.expense)
-
-                    ForEach(expense, id: \.id) { transaction in
-                        QuickAddTransactionRow(transaction: transaction)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                quickAddTransactionToEdit = transaction
-                            }
-                    }
-                    .onDelete { offsets in
-                        deleteQuickAddTransaction(offsets: offsets, from: expense)
-                    }
-                }
-            }
-        } header: {
-            Text("Quick Add Transactions")
-        }
-    }
-
     // MARK: - Helpers
 
     private var visiblePredefined: [PredefinedTransaction] {
         predefinedTransactions.filter { $0.deletedAt == nil }
-    }
-
-    private var visibleQuickAdd: [QuickAddTransaction] {
-        quickAddTransactions.filter { $0.deletedAt == nil }
     }
 
     private var cloudSection: some View {
@@ -290,13 +218,6 @@ struct SettingsTabView: View {
             modelContext.saveOrLog()
         }
     }
-
-    private func deleteQuickAddTransaction(offsets: IndexSet, from transactionsSubset: [QuickAddTransaction]) {
-        withAnimation {
-            offsets.map { transactionsSubset[$0] }.forEach { $0.markDeleted() }
-            modelContext.saveOrLog()
-        }
-    }
 }
 
 // MARK: - Sub-header row inside a Section
@@ -331,19 +252,7 @@ private struct PredefinedTransactionRow: View {
     }
 }
 
-private struct QuickAddTransactionRow: View {
-    @Bindable var transaction: QuickAddTransaction
-
-    var body: some View {
-        SettingsTransactionRow(
-            desc: transaction.desc ?? "No Description",
-            amount: transaction.amount,
-            isIncome: transaction.isIncome
-        )
-    }
-}
-
-// MARK: - Shared row layout for predefined + quick-add
+// MARK: - Shared row layout for predefined transactions
 
 private struct SettingsTransactionRow: View {
     let desc: String

@@ -18,18 +18,6 @@ struct AddTransactionView: View {
     @State private var showAlert = false
     @State private var alertMessage = ""
 
-    @Query private var quickAddTransactions: [QuickAddTransaction]
-
-    init(isIncome: Bool, selectedDay: Binding<String>) {
-        self.isIncome = isIncome
-        _selectedDay = selectedDay
-
-        _quickAddTransactions = Query(
-            filter: #Predicate<QuickAddTransaction> { $0.isIncome == isIncome },
-            sort: \QuickAddTransaction.desc
-        )
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -73,33 +61,6 @@ struct AddTransactionView: View {
                     }
                     .financeCard(padding: 18)
 
-                    if !visibleQuickAdds.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            FinanceSectionLabel(title: "Quick add", detail: "Tap to save")
-                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                                ForEach(visibleQuickAdds, id: \.id) { transaction in
-                                    Button { applyQuickAddTransaction(transaction) } label: {
-                                        VStack(alignment: .leading, spacing: 8) {
-                                            Image(systemName: "bolt.fill")
-                                                .foregroundStyle(FinanceTheme.accent)
-                                            Text(transaction.desc ?? "")
-                                                .font(.subheadline.weight(.semibold))
-                                                .foregroundStyle(.primary)
-                                                .lineLimit(1)
-                                            Text(transaction.amount.formattedAsCurrency())
-                                                .font(.caption.weight(.medium))
-                                                .foregroundStyle(isIncome ? FinanceTheme.income : FinanceTheme.expense)
-                                        }
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .financeCard(padding: 14)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityIdentifier("quickAdd_\(transaction.desc ?? "no_desc")")
-                                }
-                            }
-                        }
-                    }
-
                     Button(action: addTransaction) {
                         Text(isIncome ? "Add Income" : "Add Expense")
                     }
@@ -138,18 +99,6 @@ struct AddTransactionView: View {
             amount: Double(amount) ?? 0.0,
             desc: descriptionText,
             isIncome: isIncome
-        )
-    }
-
-    private var visibleQuickAdds: [QuickAddTransaction] {
-        quickAddTransactions.filter { $0.deletedAt == nil }
-    }
-
-    private func applyQuickAddTransaction(_ template: QuickAddTransaction) {
-        createTransaction(
-            amount: template.amount,
-            desc: template.desc ?? "",
-            isIncome: template.isIncome
         )
     }
 

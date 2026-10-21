@@ -427,63 +427,6 @@ final class MyFinanceTrackerUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts[description].exists, "Predefined Transaction '\(description)' should be deleted.")
     }
     
-    private func addQuickAddTransaction(description: String, amount: String, isIncome: Bool) {
-        tapTab(named: "Settings")
-
-        let menuButton = app.buttons["Settings_AddMenu"]
-        XCTAssertTrue(menuButton.exists, "Settings Add menu should exist")
-        menuButton.tap()
-
-        let addButton = app.buttons["AddQuickAdd_SectionHeader"]
-        XCTAssertTrue(addButton.waitForExistence(timeout: 2), "Add Quick Add Transactions menu item should exist")
-        addButton.tap()
-        
-        enterText(in: app.textFields["AddQuickAdd_DescriptionTextField"], text: description)
-        enterText(in: app.textFields["AddQuickAdd_AmountTextField"], text: amount)
-        let typeButton = isIncome ? "Income" : "Expense"
-        selectSegmentedControlOption(segmentedControlIdentifier: "AddQuickAdd_TypePicker", option: typeButton)
-        
-        let saveButton = app.buttons["AddQuickAdd_SaveButton"]
-        XCTAssertTrue(saveButton.isEnabled, "Add Quick Add Save button should be enabled")
-        saveButton.tap()
-        
-        XCTAssertTrue(app.staticTexts[description].waitForExistence(timeout: 5), "Added Quick Add Transaction should be visible in the list")
-    }
-    
-    private func editQuickAddTransaction(originalDescription: String, newDescription: String, newAmount: String, newIsIncome: Bool) {
-        tapTab(named: "Settings")
-        
-        let transaction = app.staticTexts[originalDescription]
-        XCTAssertTrue(transaction.exists, "Quick Add Transaction '\(originalDescription)' should exist.")
-        transaction.tap()
-        
-        clearAndEnterText(in: app.textFields["EditQuickAdd_DescriptionTextField"], text: newDescription)
-        clearAndEnterText(in: app.textFields["EditQuickAdd_AmountTextField"], text: newAmount)
-        let typeButton = newIsIncome ? "Income" : "Expense"
-        selectSegmentedControlOption(segmentedControlIdentifier: "EditQuickAdd_TypePicker", option: typeButton)
-        
-        let saveButton = app.buttons["EditQuickAdd_SaveButton"]
-        XCTAssertTrue(saveButton.isEnabled, "Edit Quick Add Save button should be enabled")
-        saveButton.tap()
-        
-        XCTAssertTrue(app.staticTexts[newDescription].waitForExistence(timeout: 5), "Updated Quick Add Transaction should be visible in the list")
-        XCTAssertTrue(app.staticTexts["$\(newAmount)"].exists, "Updated Quick Add Transaction amount should be $\(newAmount)")
-        XCTAssertTrue(app.staticTexts[typeButton].exists, "Updated Quick Add Transaction type should be '\(typeButton)'")
-    }
-    
-    private func deleteQuickAddTransaction(description: String) {
-        tapTab(named: "Settings")
-        
-        let cell = app.cells.containing(.staticText, identifier: description).element
-        XCTAssertTrue(cell.exists, "Quick Add Transaction cell containing '\(description)' should exist before deletion.")
-        
-        cell.swipeLeft()
-        XCTAssertTrue(app.buttons["Delete"].exists, "Delete button should appear after swiping left.")
-        app.buttons["Delete"].tap()
-        
-        XCTAssertFalse(app.staticTexts[description].exists, "Quick Add Transaction '\(description)' should be deleted.")
-    }
-    
     private func performReset() {
         tapTab(named: "Net Income")
         let resetButton = app.buttons["resetButton"]
@@ -633,15 +576,6 @@ final class MyFinanceTrackerUITests: XCTestCase {
         deletePredefinedTransaction(description: "Updated Predefined Transaction")
     }
     
-    func testQuickAddTransactionAddEditDelete() throws {
-        addQuickAddTransaction(description: "Test Quick Add Transaction", amount: "200.00", isIncome: false)
-        editQuickAddTransaction(originalDescription: "Test Quick Add Transaction",
-                                newDescription: "Updated Quick Add Transaction",
-                                newAmount: "250.00",
-                                newIsIncome: true)
-        deleteQuickAddTransaction(description: "Updated Quick Add Transaction")
-    }
-    
     func testResetButton() throws {
         addTransaction(isIncome: true, description: "Test Income", amount: "100", dayOfWeek: "Monday")
         verifyNetIncome(expected: "$100.00")
@@ -656,23 +590,6 @@ final class MyFinanceTrackerUITests: XCTestCase {
         let cell = verifyAndGetTransactionRow(isIncome: true, description: "Test Predefined Transaction", amount: "150.75", dayOfWeek: "Wednesday")
         performReset()
         deletePredefinedTransaction(description: "Test Predefined Transaction")
-    }
-    
-    func testQuickAddTransactionReflectOnAddTransactionView() throws {
-        addQuickAddTransaction(description: "Test Quick Add Transaction", amount: "100.00", isIncome: true)
-        
-        tapTab(named: "Net Income")
-        let addButton = app.buttons["addIncomeButton"]
-        addButton.tap()
-        
-        let quickAddButtonIdentifier = "quickAdd_Test Quick Add Transaction"
-        let quickAddButton = app.buttons[quickAddButtonIdentifier]
-        XCTAssertTrue(quickAddButton.exists, "Quick Add Transaction button with identifier \(quickAddButtonIdentifier) should exist")
-        quickAddButton.tap()
-        
-        verifyNetIncome(expected: "$100.00")
-        deleteQuickAddTransaction(description: "Test Quick Add Transaction")
-        performReset()
     }
     
     func testAdjustNetIncome() throws {

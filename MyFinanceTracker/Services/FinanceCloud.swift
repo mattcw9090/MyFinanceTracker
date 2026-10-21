@@ -289,7 +289,6 @@ final class FinanceCloud: ObservableObject {
         try await verifyWorkspaceAccess(token: token)
         _ = try await syncCashFlow(token: token, context: context)
         _ = try await syncPredefined(token: token, context: context)
-        _ = try await syncQuickAdd(token: token, context: context)
         let transactions = try await syncTransactions(token: token, context: context)
         _ = try await syncNetIncome(
             token: token,
@@ -536,66 +535,6 @@ final class FinanceCloud: ObservableObject {
         return counts
     }
 
-    private func syncQuickAdd(token: String, context: ModelContext) async throws -> SyncCounts {
-        let remote = try await fetchAll(
-            table: "finance_quick_add_transactions",
-            select: "id,description,amount,is_income,updated_at,deleted_at",
-            token: token,
-            as: QuickAddCloudRow.self
-        )
-        let local = try context.fetch(FetchDescriptor<QuickAddTransaction>())
-        var byID = Dictionary(local.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let remoteIDs = Set(remote.map(\.id))
-        var counts = SyncCounts()
-        var pending: [QuickAddTransaction] = []
-
-        for row in remote {
-            if let item = byID[row.id] {
-                switch cloudMergeAction(localUpdatedAt: item.updatedAt, lastSyncedAt: item.lastSyncedAt, remoteUpdatedAt: row.updatedAt) {
-                case .applyRemote:
-                    item.desc = row.description
-                    item.amount = row.amount.value
-                    item.isIncome = row.isIncome
-                    item.deletedAt = row.deletedAt
-                    item.updatedAt = row.updatedAt
-                    item.lastSyncedAt = row.updatedAt
-                    counts.downloaded += 1
-                case .uploadLocal:
-                    pending.append(item)
-                case .leave:
-                    break
-                }
-            } else {
-                let item = QuickAddTransaction(
-                    id: row.id,
-                    desc: row.description,
-                    amount: row.amount.value,
-                    isIncome: row.isIncome,
-                    updatedAt: row.updatedAt,
-                    deletedAt: row.deletedAt,
-                    lastSyncedAt: row.updatedAt
-                )
-                context.insert(item)
-                byID[row.id] = item
-                counts.downloaded += 1
-            }
-        }
-        pending.append(contentsOf: local.filter { !remoteIDs.contains($0.id) })
-        try context.save()
-        counts.uploaded += try await upload(pending, table: "finance_quick_add_transactions", token: token, context: context) { item in
-            [
-                "id": item.id.uuidString.lowercased(),
-                "workspace_id": FinanceCloudConfiguration.workspaceID.uuidString.lowercased(),
-                "description": item.desc ?? NSNull(),
-                "amount": item.amount,
-                "is_income": item.isIncome,
-                "updated_at": SupabaseTimestamp.format(item.updatedAt),
-                "deleted_at": item.deletedAt.map(SupabaseTimestamp.format) ?? NSNull()
-            ]
-        }
-        return counts
-    }
-
     private func syncTransactions(token: String, context: ModelContext) async throws -> SyncCounts {
         let remote = try await fetchAll(
             table: "finance_transactions",
@@ -811,19 +750,6 @@ final class FinanceCloud: ObservableObject {
                 "description": item.desc ?? NSNull(),
                 "amount": item.amount,
                 "day_of_week": item.dayOfWeek ?? NSNull(),
-                "is_income": item.isIncome,
-                "updated_at": SupabaseTimestamp.format(item.updatedAt),
-                "deleted_at": item.deletedAt.map(SupabaseTimestamp.format) ?? NSNull()
-            ]
-        }
-
-        let quickAdd = try context.fetch(FetchDescriptor<QuickAddTransaction>()).filter { $0.needsCloudUpload }
-        _ = try await upload(quickAdd, table: "finance_quick_add_transactions", token: token, context: context) { item in
-            [
-                "id": item.id.uuidString.lowercased(),
-                "workspace_id": workspace,
-                "description": item.desc ?? NSNull(),
-                "amount": item.amount,
                 "is_income": item.isIncome,
                 "updated_at": SupabaseTimestamp.format(item.updatedAt),
                 "deleted_at": item.deletedAt.map(SupabaseTimestamp.format) ?? NSNull()
@@ -1138,22 +1064,6 @@ private struct TemplateCloudRow: Decodable {
     enum CodingKeys: String, CodingKey {
         case id, description, amount
         case dayOfWeek = "day_of_week"
-        case isIncome = "is_income"
-        case updatedAt = "updated_at"
-        case deletedAt = "deleted_at"
-    }
-}
-
-private struct QuickAddCloudRow: Decodable {
-    let id: UUID
-    let description: String?
-    let amount: JSONDouble
-    let isIncome: Bool
-    let updatedAt: Date
-    let deletedAt: Date?
-
-    enum CodingKeys: String, CodingKey {
-        case id, description, amount
         case isIncome = "is_income"
         case updatedAt = "updated_at"
         case deletedAt = "deleted_at"

@@ -110,6 +110,7 @@ struct FinanceSyncTests {
         let v1 = Set(Schema(versionedSchema: AppSchemaV1.self).entities.map(\.name))
         let v2 = Set(Schema(versionedSchema: AppSchemaV2.self).entities.map(\.name))
         let v3 = Set(Schema(versionedSchema: AppSchemaV3.self).entities.map(\.name))
+        let v4 = Set(Schema(versionedSchema: AppSchemaV4.self).entities.map(\.name))
         #expect(v1 == [
             "CashFlowItem",
             "NetIncomeEntity",
@@ -119,6 +120,12 @@ struct FinanceSyncTests {
         ])
         #expect(v1 == v2)
         #expect(v1 == v3)
+        #expect(v4 == [
+            "CashFlowItem",
+            "NetIncomeEntity",
+            "PredefinedTransaction",
+            "Transaction"
+        ])
         let v2Fields = transactionPropertyNames(AppSchemaV2.self)
         let v3Fields = transactionPropertyNames(AppSchemaV3.self)
         #expect(v2Fields.contains("coachingSessionID") == false)
@@ -135,6 +142,8 @@ struct FinanceSyncTests {
         defer { try? FileManager.default.removeItem(at: directory) }
 
         let originalID = UUID()
+        let cashID = UUID()
+        let predefinedID = UUID()
         do {
             let schema = Schema(versionedSchema: AppSchemaV1.self)
             let container = try ModelContainer(
@@ -152,10 +161,30 @@ struct FinanceSyncTests {
                 isIncome: true
             ))
             context.insert(AppSchemaV1.NetIncomeEntity(value: 80))
+            context.insert(AppSchemaV1.CashFlowItem(
+                id: cashID,
+                name: "Court",
+                amount: 12,
+                isOwedToMe: true,
+                isSettled: false
+            ))
+            context.insert(AppSchemaV1.PredefinedTransaction(
+                id: predefinedID,
+                desc: "Rent",
+                amount: 40,
+                dayOfWeek: "Monday",
+                isIncome: false
+            ))
+            context.insert(AppSchemaV1.QuickAddTransaction(
+                id: UUID(),
+                desc: "Coffee",
+                amount: 5,
+                isIncome: false
+            ))
             try context.save()
         }
 
-        let schema = Schema(versionedSchema: AppSchemaV3.self)
+        let schema = Schema(versionedSchema: AppSchemaV4.self)
         let container = try ModelContainer(
             for: schema,
             migrationPlan: AppMigrationPlan.self,
@@ -177,6 +206,22 @@ struct FinanceSyncTests {
         #expect(balances.count == 1)
         #expect(balances[0].value == 80)
         #expect(balances[0].deletedAt == nil)
+
+        let cash = try context.fetch(FetchDescriptor<CashFlowItem>())
+        #expect(cash.count == 1)
+        #expect(cash[0].id == cashID)
+        #expect(cash[0].name == "Court")
+        #expect(cash[0].amount == 12)
+        #expect(cash[0].isOwedToMe == true)
+        #expect(cash[0].deletedAt == nil)
+
+        let predefined = try context.fetch(FetchDescriptor<PredefinedTransaction>())
+        #expect(predefined.count == 1)
+        #expect(predefined[0].id == predefinedID)
+        #expect(predefined[0].desc == "Rent")
+        #expect(predefined[0].amount == 40)
+        #expect(predefined[0].isIncome == false)
+        #expect(Set(container.schema.entities.map(\.name)).contains("QuickAddTransaction") == false)
     }
 
     @Test func coachingLinkMigrationKeepsExistingRows() throws {
@@ -206,10 +251,18 @@ struct FinanceSyncTests {
                 updatedAt: synced,
                 lastSyncedAt: synced
             ))
+            context.insert(AppSchemaV2.QuickAddTransaction(
+                id: UUID(),
+                desc: "Coffee",
+                amount: 5,
+                isIncome: true,
+                updatedAt: synced,
+                lastSyncedAt: synced
+            ))
             try context.save()
         }
 
-        let schema = Schema(versionedSchema: AppSchemaV3.self)
+        let schema = Schema(versionedSchema: AppSchemaV4.self)
         let container = try ModelContainer(
             for: schema,
             migrationPlan: AppMigrationPlan.self,
@@ -224,6 +277,114 @@ struct FinanceSyncTests {
         #expect(transactions[0].updatedAt == synced)
         #expect(transactions[0].coachingSessionID == nil)
         #expect(transactions[0].coachingWeekStart == nil)
+        #expect(Set(container.schema.entities.map(\.name)).contains("QuickAddTransaction") == false)
+    }
+
+    @Test func droppingQuickAddKeepsTheOtherRows() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "finance-v3-migration-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let storeURL = directory.appending(path: "Finance.store")
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let transactionID = UUID()
+        let balanceID = UUID()
+        let cashID = UUID()
+        let predefinedID = UUID()
+        let sessionID = UUID()
+        let synced = Date(timeIntervalSince1970: 1_700_000_000)
+        let week = Date(timeIntervalSince1970: 1_729_296_000)
+        do {
+            let schema = Schema(versionedSchema: AppSchemaV3.self)
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: AppMigrationPlan.self,
+                configurations: [ModelConfiguration(schema: schema, url: storeURL)]
+            )
+            let context = ModelContext(container)
+            context.insert(Transaction(
+                id: transactionID,
+                desc: "Coaching",
+                amount: 80,
+                dayOfWeek: "Monday",
+                isCompleted: true,
+                isIncome: true,
+                updatedAt: synced,
+                lastSyncedAt: synced,
+                coachingSessionID: sessionID,
+                coachingWeekStart: week
+            ))
+            context.insert(NetIncomeEntity(
+                id: balanceID,
+                value: -520,
+                updatedAt: synced,
+                lastSyncedAt: synced
+            ))
+            context.insert(CashFlowItem(
+                id: cashID,
+                name: "Court",
+                amount: 12,
+                isOwedToMe: false,
+                isSettled: true,
+                updatedAt: synced,
+                lastSyncedAt: synced
+            ))
+            context.insert(PredefinedTransaction(
+                id: predefinedID,
+                desc: "Rent",
+                amount: 40,
+                dayOfWeek: "Monday",
+                isIncome: false,
+                updatedAt: synced,
+                lastSyncedAt: synced
+            ))
+            context.insert(AppSchemaV3.QuickAddTransaction(
+                id: UUID(),
+                desc: "Coffee",
+                amount: 5,
+                isIncome: true,
+                updatedAt: synced,
+                lastSyncedAt: synced
+            ))
+            try context.save()
+        }
+
+        let schema = Schema(versionedSchema: AppSchemaV4.self)
+        let container = try ModelContainer(
+            for: schema,
+            migrationPlan: AppMigrationPlan.self,
+            configurations: [ModelConfiguration(schema: schema, url: storeURL)]
+        )
+        let context = ModelContext(container)
+        let transactions = try context.fetch(FetchDescriptor<Transaction>())
+        #expect(transactions.count == 1)
+        #expect(transactions[0].id == transactionID)
+        #expect(transactions[0].amount == 80)
+        #expect(transactions[0].isCompleted == true)
+        #expect(transactions[0].updatedAt == synced)
+        #expect(transactions[0].lastSyncedAt == synced)
+        #expect(transactions[0].coachingSessionID == sessionID)
+        #expect(transactions[0].coachingWeekStart == week)
+
+        let balances = try context.fetch(FetchDescriptor<NetIncomeEntity>())
+        #expect(balances.count == 1)
+        #expect(balances[0].id == balanceID)
+        #expect(balances[0].value == -520)
+        #expect(balances[0].updatedAt == synced)
+
+        let cash = try context.fetch(FetchDescriptor<CashFlowItem>())
+        #expect(cash.count == 1)
+        #expect(cash[0].id == cashID)
+        #expect(cash[0].name == "Court")
+        #expect(cash[0].isSettled == true)
+        #expect(cash[0].updatedAt == synced)
+
+        let predefined = try context.fetch(FetchDescriptor<PredefinedTransaction>())
+        #expect(predefined.count == 1)
+        #expect(predefined[0].id == predefinedID)
+        #expect(predefined[0].desc == "Rent")
+        #expect(predefined[0].updatedAt == synced)
+        #expect(Set(container.schema.entities.map(\.name)).contains("QuickAddTransaction") == false)
     }
 
     @Test func offlineSyncStaysSilent() {

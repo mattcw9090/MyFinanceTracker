@@ -13,3 +13,7 @@ Importing CoachPlanner sessions is handled by `public.coaching_sessions_for_fina
 ## Cloud week reset
 
 Resetting the week is `public.reset_finance_week`. Initializing the week is `public.reinitialize_finance_week`. Change that behavior in the Supabase functions, not in the app. The app pushes pending edits, calls the function, then pulls. Initialize sends today's weekday for a predefined row that has no day, and it does not call the function when this phone has no live predefined rows.
+
+## Quick add
+
+Quick add is gone. The app does not read or write `finance_quick_add_transactions`. `Backend/migrations/2026-10-21_drop_finance_quick_add.sql` recreates the week functions without that table and then drops it. Do not apply that file until this build is installed.
