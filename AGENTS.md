@@ -5,3 +5,7 @@ Here is the code repository for a SwiftUI app I have made for budgetting my pers
 ## Cloud completion
 
 Ticking a transaction is handled by `public.complete_finance_transaction`. Change that behavior in the Supabase function, not in the app. The app only sends the transaction id, whether to add cash-flow items, the extra cost, and the split names.
+
+## Cloud session import
+
+Importing CoachPlanner sessions is handled by `public.coaching_sessions_for_finance` and `public.import_coaching_sessions_to_finance`. Change that behavior in the Supabase functions, not in the app. The app previews one week, then asks the import function to add sessions that are not already imported.

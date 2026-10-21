@@ -12,6 +12,8 @@ final class Transaction {
     var updatedAt: Date = Date.now
     var deletedAt: Date? = nil
     var lastSyncedAt: Date? = nil
+    var coachingSessionID: UUID? = nil
+    var coachingWeekStart: Date? = nil
 
     init(
         id: UUID = UUID(),
@@ -22,7 +24,9 @@ final class Transaction {
         isIncome: Bool = false,
         updatedAt: Date = .now,
         deletedAt: Date? = nil,
-        lastSyncedAt: Date? = nil
+        lastSyncedAt: Date? = nil,
+        coachingSessionID: UUID? = nil,
+        coachingWeekStart: Date? = nil
     ) {
         self.id = id
         self.desc = desc
@@ -33,6 +37,8 @@ final class Transaction {
         self.updatedAt = updatedAt
         self.deletedAt = deletedAt
         self.lastSyncedAt = lastSyncedAt
+        self.coachingSessionID = coachingSessionID
+        self.coachingWeekStart = coachingWeekStart
     }
 }
 

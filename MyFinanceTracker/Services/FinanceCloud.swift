@@ -139,6 +139,71 @@ final class FinanceCloud: ObservableObject {
         }
     }
 
+    /// Reads one week's coaching sessions. Does not insert transactions or change net income.
+    func previewCoachingSessions(weekStart: Date) async throws -> [CoachingSessionPreview] {
+        try await prepareCoachingImport()
+        do {
+            let token = try await validAccessToken()
+            return try await invokeCoachingSessionsPreview(weekStart: weekStart, token: token)
+        } catch {
+            throw Self.importFailure(from: error)
+        }
+    }
+
+    /// Inserts the week's new sessions in Supabase, then pulls them. Nothing is
+    /// written locally until that pull succeeds.
+    func importCoachingSessions(weekStart: Date, in context: ModelContext) async throws -> Int {
+        try await prepareCoachingImport()
+
+        isBusy = true
+        let autosave = context.autosaveEnabled
+        context.autosaveEnabled = false
+        defer {
+            context.autosaveEnabled = autosave
+            isBusy = false
+        }
+
+        let added: Int
+        do {
+            let token = try await validAccessToken()
+            added = try await invokeImportCoachingSessions(weekStart: weekStart, token: token)
+        } catch {
+            throw Self.importFailure(from: error)
+        }
+
+        do {
+            try await performSync(in: context)
+        } catch {
+            throw FinanceCloudError.importNotDownloaded
+        }
+        return added
+    }
+
+    private func prepareCoachingImport() async throws {
+        let online = await Self.networkIsOnline()
+        guard shouldImportSessionsOnline(isSignedIn: isSignedIn, isOnline: online) else {
+            throw FinanceCloudError.importNeedsConnection
+        }
+        let deadline = Date().addingTimeInterval(60)
+        while isBusy {
+            if Date() >= deadline { throw FinanceCloudError.importNeedsConnection }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
+    private static func importFailure(from error: Error) -> Error {
+        if let cloud = error as? FinanceCloudError {
+            if case .notSignedIn = cloud { return FinanceCloudError.importNeedsConnection }
+            if case .importNeedsConnection = cloud { return cloud }
+            if case .importNotDownloaded = cloud { return cloud }
+            if case .requestFailed = cloud { return cloud }
+            if case .invalidResponse = cloud { return cloud }
+            if case .workspaceUnavailable = cloud { return cloud }
+            return FinanceCloudError.importNeedsConnection
+        }
+        return FinanceCloudError.importNeedsConnection
+    }
+
     private func performSync(in context: ModelContext) async throws {
         NetIncomeManager.shared.flushPendingSave()
         let token = try await validAccessToken()
@@ -209,18 +274,43 @@ final class FinanceCloud: ObservableObject {
         }
     }
 
+    private func invokeCoachingSessionsPreview(weekStart: Date, token: String) async throws -> [CoachingSessionPreview] {
+        let call = coachingSessionsPreviewCall(weekStart: weekStart)
+        let url = Self.endpoint(path: call.path, query: [])
+        let payload = try JSONSerialization.data(withJSONObject: coachingSessionsPreviewBody(call))
+        let data = try await send(url: url, method: call.httpMethod, body: payload, token: token)
+        do {
+            return try makeDecoder().decode([CoachingSessionPreview].self, from: data)
+        } catch {
+            throw FinanceCloudError.invalidResponse
+        }
+    }
+
+    private func invokeImportCoachingSessions(weekStart: Date, token: String) async throws -> Int {
+        let call = importCoachingSessionsCall(weekStart: weekStart, sessionIDs: nil)
+        let url = Self.endpoint(path: call.path, query: [])
+        let payload = try JSONSerialization.data(withJSONObject: importCoachingSessionsBody(call))
+        let data = try await send(url: url, method: call.httpMethod, body: payload, token: token)
+        guard let added = try? JSONDecoder().decode(Int.self, from: data) else {
+            throw FinanceCloudError.invalidResponse
+        }
+        return added
+    }
+
     private func transactionBody(_ item: Transaction) -> [String: Any] {
-        [
-            "id": item.id.uuidString.lowercased(),
-            "workspace_id": FinanceCloudConfiguration.workspaceID.uuidString.lowercased(),
-            "description": item.desc ?? NSNull(),
-            "amount": item.amount,
-            "day_of_week": item.dayOfWeek ?? NSNull(),
-            "is_completed": item.isCompleted,
-            "is_income": item.isIncome,
-            "updated_at": SupabaseTimestamp.format(item.updatedAt),
-            "deleted_at": item.deletedAt.map(SupabaseTimestamp.format) ?? NSNull()
-        ]
+        transactionUploadBody(
+            id: item.id,
+            workspaceID: FinanceCloudConfiguration.workspaceID,
+            description: item.desc,
+            amount: item.amount,
+            dayOfWeek: item.dayOfWeek,
+            isCompleted: item.isCompleted,
+            isIncome: item.isIncome,
+            updatedAt: item.updatedAt,
+            deletedAt: item.deletedAt,
+            coachingSessionID: item.coachingSessionID,
+            coachingWeekStart: item.coachingWeekStart
+        )
     }
 
     private static func networkIsOnline() async -> Bool {
@@ -429,7 +519,7 @@ final class FinanceCloud: ObservableObject {
     private func syncTransactions(token: String, context: ModelContext) async throws -> SyncCounts {
         let remote = try await fetchAll(
             table: "finance_transactions",
-            select: "id,description,amount,day_of_week,is_completed,is_income,updated_at,deleted_at",
+            select: "id,description,amount,day_of_week,is_completed,is_income,coaching_session_id,coaching_week_start,updated_at,deleted_at",
             token: token,
             as: TransactionCloudRow.self
         )
@@ -457,14 +547,17 @@ final class FinanceCloud: ObservableObject {
                     item.dayOfWeek = row.dayOfWeek
                     item.isCompleted = row.isCompleted
                     item.isIncome = row.isIncome
+                    item.coachingSessionID = row.coachingSessionID
+                    item.coachingWeekStart = row.coachingWeekStart
                     item.deletedAt = row.deletedAt
                     item.updatedAt = row.updatedAt
                     item.lastSyncedAt = row.updatedAt
                     counts.downloaded += 1
                 case .uploadLocal:
+                    keepCoachingLink(on: item, from: row)
                     pending.append(item)
                 case .leave:
-                    break
+                    keepCoachingLink(on: item, from: row)
                 }
             } else {
                 let item = Transaction(
@@ -476,7 +569,9 @@ final class FinanceCloud: ObservableObject {
                     isIncome: row.isIncome,
                     updatedAt: row.updatedAt,
                     deletedAt: row.deletedAt,
-                    lastSyncedAt: row.updatedAt
+                    lastSyncedAt: row.updatedAt,
+                    coachingSessionID: row.coachingSessionID,
+                    coachingWeekStart: row.coachingWeekStart
                 )
                 context.insert(item)
                 byID[row.id] = item
@@ -497,6 +592,17 @@ final class FinanceCloud: ObservableObject {
             transactionBody(item)
         }
         return counts
+    }
+
+    /// Fills a missing local link from the server. Never writes null over a value
+    /// this phone already has, and never uploads null for these columns.
+    private func keepCoachingLink(on item: Transaction, from row: TransactionCloudRow) {
+        if item.coachingSessionID == nil {
+            item.coachingSessionID = row.coachingSessionID
+        }
+        if item.coachingWeekStart == nil {
+            item.coachingWeekStart = row.coachingWeekStart
+        }
     }
 
     private func syncNetIncome(token: String, context: ModelContext) async throws -> SyncCounts {
@@ -879,6 +985,8 @@ private struct TransactionCloudRow: Decodable {
     let dayOfWeek: String?
     let isCompleted: Bool
     let isIncome: Bool
+    let coachingSessionID: UUID?
+    let coachingWeekStart: Date?
     let updatedAt: Date
     let deletedAt: Date?
 
@@ -887,6 +995,8 @@ private struct TransactionCloudRow: Decodable {
         case dayOfWeek = "day_of_week"
         case isCompleted = "is_completed"
         case isIncome = "is_income"
+        case coachingSessionID = "coaching_session_id"
+        case coachingWeekStart = "coaching_week_start"
         case updatedAt = "updated_at"
         case deletedAt = "deleted_at"
     }
@@ -912,6 +1022,8 @@ enum FinanceCloudError: LocalizedError {
     case requestFailed(String)
     case needsConnection
     case completionNotDownloaded
+    case importNeedsConnection
+    case importNotDownloaded
 
     var errorDescription: String? {
         switch self {
@@ -927,6 +1039,10 @@ enum FinanceCloudError: LocalizedError {
             return "Ticking a transaction needs an internet connection."
         case .completionNotDownloaded:
             return "The transaction was ticked online, but this phone couldn't download it. Pull to refresh."
+        case .importNeedsConnection:
+            return "Importing sessions needs an internet connection."
+        case .importNotDownloaded:
+            return "The import finished online, but this phone couldn't download it. Pull to refresh."
         }
     }
 }

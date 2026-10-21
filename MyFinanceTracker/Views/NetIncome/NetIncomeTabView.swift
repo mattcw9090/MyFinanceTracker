@@ -103,7 +103,6 @@ struct NetIncomeTabView: View {
             }
             .sheet(isPresented: $showingImportSessions) {
                 ImportSessionsView()
-                    .environmentObject(netIncomeManager)
             }
             .alert(item: $activeAlert) { alertType in
                 switch alertType {

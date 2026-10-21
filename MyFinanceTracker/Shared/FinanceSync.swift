@@ -100,6 +100,153 @@ func shouldCompleteTransactionOnline(isSignedIn: Bool, isOnline: Bool) -> Bool {
     isSignedIn && isOnline
 }
 
+func shouldImportSessionsOnline(isSignedIn: Bool, isOnline: Bool) -> Bool {
+    isSignedIn && isOnline
+}
+
+struct CoachingSessionPreview: Decodable, Identifiable, Equatable {
+    let sessionID: UUID
+    let weekStart: Date
+    let dayOfWeek: String
+    let sessionName: String
+    let sessionFee: Double
+    let startTime: Date
+    let alreadyImported: Bool
+
+    var id: UUID { sessionID }
+
+    enum CodingKeys: String, CodingKey {
+        case sessionID = "session_id"
+        case weekStart = "week_start"
+        case dayOfWeek = "day_of_week"
+        case sessionName = "session_name"
+        case sessionFee = "session_fee"
+        case startTime = "start_time"
+        case alreadyImported = "already_imported"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        sessionID = try container.decode(UUID.self, forKey: .sessionID)
+        weekStart = try container.decode(Date.self, forKey: .weekStart)
+        dayOfWeek = try container.decodeIfPresent(String.self, forKey: .dayOfWeek) ?? ""
+        let name = try container.decodeIfPresent(String.self, forKey: .sessionName)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        sessionName = name.isEmpty ? "Coaching" : name
+        sessionFee = try Self.decodeFee(container)
+        startTime = try container.decode(Date.self, forKey: .startTime)
+        alreadyImported = try container.decodeIfPresent(Bool.self, forKey: .alreadyImported) ?? false
+    }
+
+    private static func decodeFee(_ container: KeyedDecodingContainer<CodingKeys>) throws -> Double {
+        if let number = try? container.decode(Double.self, forKey: .sessionFee) {
+            return number
+        }
+        if let text = try? container.decode(String.self, forKey: .sessionFee), let number = Double(text) {
+            return number
+        }
+        if try container.decodeNil(forKey: .sessionFee) {
+            return 0
+        }
+        throw DecodingError.dataCorruptedError(
+            forKey: .sessionFee,
+            in: container,
+            debugDescription: "Expected a session fee"
+        )
+    }
+}
+
+/// Sessions the import function will insert: not already imported, fee above zero.
+func importableCoachingSessions(_ sessions: [CoachingSessionPreview]) -> [CoachingSessionPreview] {
+    sessions.filter { !$0.alreadyImported && $0.sessionFee > 0 }
+}
+
+func importSessionsSuccessMessage(added: Int) -> String {
+    if added == 0 {
+        return "No new sessions were added."
+    }
+    if added == 1 {
+        return "Added 1 income transaction."
+    }
+    return "Added \(added) income transactions."
+}
+
+struct CoachingSessionsPreviewCall: Equatable {
+    var httpMethod: String
+    var path: String
+    var weekStart: String
+}
+
+func coachingSessionsPreviewCall(weekStart: Date) -> CoachingSessionsPreviewCall {
+    CoachingSessionsPreviewCall(
+        httpMethod: "POST",
+        path: "/rest/v1/rpc/coaching_sessions_for_finance",
+        weekStart: PerthWeek.dateOnlyString(from: weekStart)
+    )
+}
+
+func coachingSessionsPreviewBody(_ call: CoachingSessionsPreviewCall) -> [String: Any] {
+    ["p_week_start": call.weekStart]
+}
+
+struct ImportCoachingSessionsCall: Equatable {
+    var httpMethod: String
+    var path: String
+    var weekStart: String
+    var sessionIDs: [String]?
+}
+
+/// `sessionIDs == nil` asks the function to import the whole week.
+func importCoachingSessionsCall(weekStart: Date, sessionIDs: [UUID]?) -> ImportCoachingSessionsCall {
+    ImportCoachingSessionsCall(
+        httpMethod: "POST",
+        path: "/rest/v1/rpc/import_coaching_sessions_to_finance",
+        weekStart: PerthWeek.dateOnlyString(from: weekStart),
+        sessionIDs: sessionIDs?.map { $0.uuidString.lowercased() }
+    )
+}
+
+func importCoachingSessionsBody(_ call: ImportCoachingSessionsCall) -> [String: Any] {
+    [
+        "p_week_start": call.weekStart,
+        "p_session_ids": call.sessionIDs.map { $0 as Any } ?? NSNull()
+    ]
+}
+
+/// Upsert body for `finance_transactions`. Nil coaching link fields are left
+/// out so merge-duplicates cannot clear a value this phone has not loaded.
+func transactionUploadBody(
+    id: UUID,
+    workspaceID: UUID,
+    description: String?,
+    amount: Double,
+    dayOfWeek: String?,
+    isCompleted: Bool,
+    isIncome: Bool,
+    updatedAt: Date,
+    deletedAt: Date?,
+    coachingSessionID: UUID?,
+    coachingWeekStart: Date?
+) -> [String: Any] {
+    var body: [String: Any] = [
+        "id": id.uuidString.lowercased(),
+        "workspace_id": workspaceID.uuidString.lowercased(),
+        "description": description ?? NSNull(),
+        "amount": amount,
+        "day_of_week": dayOfWeek ?? NSNull(),
+        "is_completed": isCompleted,
+        "is_income": isIncome,
+        "updated_at": SupabaseTimestamp.format(updatedAt),
+        "deleted_at": deletedAt.map(SupabaseTimestamp.format) ?? NSNull()
+    ]
+    if let coachingSessionID {
+        body["coaching_session_id"] = coachingSessionID.uuidString.lowercased()
+    }
+    if let coachingWeekStart {
+        body["coaching_week_start"] = SupabaseTimestamp.formatDateOnly(coachingWeekStart)
+    }
+    return body
+}
+
 enum SupabaseTimestamp {
     private static let fractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
@@ -113,13 +260,30 @@ enum SupabaseTimestamp {
         return formatter
     }()
 
+    private static let dateOnly: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.isLenient = false
+        return formatter
+    }()
+
     static func format(_ date: Date) -> String {
         fractional.string(from: date)
+    }
+
+    /// Calendar date stored for `coaching_week_start`. Parsed date-only values
+    /// are UTC midnight, so formatting them here returns the same `yyyy-MM-dd`.
+    static func formatDateOnly(_ date: Date) -> String {
+        dateOnly.string(from: date)
     }
 
     static func parse(_ value: String) -> Date? {
         if let date = fractional.date(from: value) { return date }
         if let date = wholeSeconds.date(from: value) { return date }
+        if value.count == 10, let date = dateOnly.date(from: value) { return date }
         let normalized = trimmingFraction(value)
         guard normalized != value else { return nil }
         return fractional.date(from: normalized) ?? wholeSeconds.date(from: normalized)
