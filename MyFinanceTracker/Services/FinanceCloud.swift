@@ -200,6 +200,64 @@ final class FinanceCloud: ObservableObject {
         return added
     }
 
+    /// Soft-deletes the live week on the server, then downloads that result.
+    /// Local rows stay as they are until the download.
+    func resetFinanceWeek(in context: ModelContext) async throws {
+        try await runFinanceWeekChange(in: context, failure: .resetNeedsConnection) { token in
+            try await invokeResetFinanceWeek(token: token)
+        }
+    }
+
+    /// Rebuilds the week from predefined transactions. `unscheduledDay` is used
+    /// only for a template that has no day of its own.
+    func reinitializeFinanceWeek(unscheduledDay: String, in context: ModelContext) async throws {
+        try await runFinanceWeekChange(in: context, failure: .initializeNeedsConnection) { token in
+            try await invokeReinitializeFinanceWeek(unscheduledDay: unscheduledDay, token: token)
+        }
+    }
+
+    private func runFinanceWeekChange(
+        in context: ModelContext,
+        failure: FinanceCloudError,
+        rpc: (String) async throws -> Void
+    ) async throws {
+        try await prepareOnlineFinanceChange(failure: failure)
+
+        isBusy = true
+        let autosave = context.autosaveEnabled
+        context.autosaveEnabled = false
+        defer {
+            context.autosaveEnabled = autosave
+            isBusy = false
+        }
+
+        do {
+            let token = try await validAccessToken()
+            try await pushPendingChanges(token: token, context: context)
+            try await rpc(token)
+        } catch {
+            throw failure
+        }
+
+        do {
+            try await performSync(in: context)
+        } catch {
+            throw FinanceCloudError.weekChangeNotDownloaded
+        }
+    }
+
+    private func prepareOnlineFinanceChange(failure: FinanceCloudError) async throws {
+        let online = await Self.networkIsOnline()
+        guard shouldUpdateFinanceWeekOnline(isSignedIn: isSignedIn, isOnline: online) else {
+            throw failure
+        }
+        let deadline = Date().addingTimeInterval(60)
+        while isBusy {
+            if Date() >= deadline { throw failure }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
     private func prepareCoachingImport() async throws {
         let online = await Self.networkIsOnline()
         guard shouldImportSessionsOnline(isSignedIn: isSignedIn, isOnline: online) else {
@@ -232,8 +290,12 @@ final class FinanceCloud: ObservableObject {
         _ = try await syncCashFlow(token: token, context: context)
         _ = try await syncPredefined(token: token, context: context)
         _ = try await syncQuickAdd(token: token, context: context)
-        _ = try await syncTransactions(token: token, context: context)
-        _ = try await syncNetIncome(token: token, context: context)
+        let transactions = try await syncTransactions(token: token, context: context)
+        _ = try await syncNetIncome(
+            token: token,
+            context: context,
+            transactionDelta: transactions.balanceDelta
+        )
     }
 
     private func pushTransactionIfNeeded(_ transaction: Transaction, context: ModelContext) async throws {
@@ -266,6 +328,26 @@ final class FinanceCloud: ObservableObject {
         )
         let url = Self.endpoint(path: call.path, query: [])
         let payload = try JSONSerialization.data(withJSONObject: completeFinanceTransactionBody(call))
+        let data = try await send(url: url, method: call.httpMethod, body: payload, token: token)
+        guard (try? JSONDecoder().decode(Int.self, from: data)) != nil else {
+            throw FinanceCloudError.invalidResponse
+        }
+    }
+
+    private func invokeResetFinanceWeek(token: String) async throws {
+        let call = resetFinanceWeekCall()
+        let url = Self.endpoint(path: call.path, query: [])
+        let payload = try JSONSerialization.data(withJSONObject: resetFinanceWeekBody())
+        let data = try await send(url: url, method: call.httpMethod, body: payload, token: token)
+        guard (try? JSONDecoder().decode(Int.self, from: data)) != nil else {
+            throw FinanceCloudError.invalidResponse
+        }
+    }
+
+    private func invokeReinitializeFinanceWeek(unscheduledDay: String, token: String) async throws {
+        let call = reinitializeFinanceWeekCall(unscheduledDay: unscheduledDay)
+        let url = Self.endpoint(path: call.path, query: [])
+        let payload = try JSONSerialization.data(withJSONObject: reinitializeFinanceWeekBody(call))
         let data = try await send(url: url, method: call.httpMethod, body: payload, token: token)
         guard (try? JSONDecoder().decode(Int.self, from: data)) != nil else {
             throw FinanceCloudError.invalidResponse
@@ -582,9 +664,7 @@ final class FinanceCloud: ObservableObject {
             }
         }
         pending.append(contentsOf: local.filter { !remoteIDs.contains($0.id) })
-        if balanceDelta != 0 {
-            NetIncomeManager.shared.applyRemoteTransactionDelta(balanceDelta)
-        }
+        counts.balanceDelta = balanceDelta
         try context.save()
         counts.uploaded += try await upload(pending, table: "finance_transactions", token: token, context: context) { item in
             transactionBody(item)
@@ -603,7 +683,11 @@ final class FinanceCloud: ObservableObject {
         }
     }
 
-    private func syncNetIncome(token: String, context: ModelContext) async throws -> SyncCounts {
+    private func syncNetIncome(
+        token: String,
+        context: ModelContext,
+        transactionDelta: Double
+    ) async throws -> SyncCounts {
         let remote = try await fetchAll(
             table: "finance_net_income",
             select: "id,value,updated_at,deleted_at",
@@ -611,11 +695,15 @@ final class FinanceCloud: ObservableObject {
             as: NetIncomeCloudRow.self
         )
         let local = try context.fetch(FetchDescriptor<NetIncomeEntity>())
+        let beforePull = Dictionary(
+            local.map { ($0.id, (value: $0.value, updatedAt: $0.updatedAt, lastSyncedAt: $0.lastSyncedAt)) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        let remoteByID = Dictionary(remote.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var byID = Dictionary(local.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let remoteIDs = Set(remote.map(\.id))
         var counts = SyncCounts()
         var pending: [NetIncomeEntity] = []
-        var appliedRemote = false
 
         for row in remote {
             if let item = byID[row.id] {
@@ -625,7 +713,6 @@ final class FinanceCloud: ObservableObject {
                     item.deletedAt = row.deletedAt
                     item.updatedAt = row.updatedAt
                     item.lastSyncedAt = row.updatedAt
-                    appliedRemote = true
                     counts.downloaded += 1
                 case .uploadLocal:
                     pending.append(item)
@@ -642,13 +729,47 @@ final class FinanceCloud: ObservableObject {
                 )
                 context.insert(item)
                 byID[row.id] = item
-                appliedRemote = true
                 counts.downloaded += 1
             }
         }
         pending.append(contentsOf: local.filter { !remoteIDs.contains($0.id) })
-        if appliedRemote {
+        let canonical = byID.values.filter { $0.deletedAt == nil }.max { lhs, rhs in
+            if lhs.updatedAt != rhs.updatedAt { return lhs.updatedAt < rhs.updatedAt }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+        let prior = canonical.flatMap { beforePull[$0.id] }
+        let server = canonical.flatMap { remoteByID[$0.id] }
+        let serverIsLive = server?.deletedAt == nil
+        let action = netIncomePullAction(
+            localValue: prior?.value ?? NetIncomeManager.shared.netIncome,
+            localUpdatedAt: prior?.updatedAt ?? .distantPast,
+            localLastSyncedAt: prior?.lastSyncedAt,
+            serverValue: serverIsLive ? server?.value.value : nil,
+            serverUpdatedAt: serverIsLive ? server?.updatedAt : nil,
+            transactionDelta: transactionDelta
+        )
+        switch action {
+        case .adoptServer(let value):
+            if let canonical {
+                canonical.value = value
+                pending.removeAll { $0.id == canonical.id }
+            }
             NetIncomeManager.shared.adoptStoredValue()
+        case .adjustLocal(let value, let upload):
+            if let canonical {
+                if canonical.value != value {
+                    canonical.value = value
+                    canonical.markLocalEdit()
+                }
+                if upload, !pending.contains(where: { $0.id == canonical.id }) {
+                    pending.append(canonical)
+                }
+                if NetIncomeManager.shared.netIncome != canonical.value {
+                    NetIncomeManager.shared.adoptStoredValue()
+                }
+            } else if value != NetIncomeManager.shared.netIncome {
+                NetIncomeManager.shared.applyRemoteTransactionDelta(value - NetIncomeManager.shared.netIncome)
+            }
         }
         try context.save()
         counts.uploaded += try await upload(pending, table: "finance_net_income", token: token, context: context) { item in
@@ -661,6 +782,69 @@ final class FinanceCloud: ObservableObject {
             ]
         }
         return counts
+    }
+
+    /// Uploads rows edited on this phone. Does not download or change other local rows.
+    private func pushPendingChanges(token: String, context: ModelContext) async throws {
+        NetIncomeManager.shared.flushPendingSave()
+        let workspace = FinanceCloudConfiguration.workspaceID.uuidString.lowercased()
+
+        let cashFlow = try context.fetch(FetchDescriptor<CashFlowItem>()).filter { $0.needsCloudUpload }
+        _ = try await upload(cashFlow, table: "finance_cash_flow_items", token: token, context: context) { item in
+            [
+                "id": item.id.uuidString.lowercased(),
+                "workspace_id": workspace,
+                "name": item.name ?? NSNull(),
+                "amount": item.amount,
+                "is_owed_to_me": item.isOwedToMe,
+                "is_settled": item.isSettled,
+                "updated_at": SupabaseTimestamp.format(item.updatedAt),
+                "deleted_at": item.deletedAt.map(SupabaseTimestamp.format) ?? NSNull()
+            ]
+        }
+
+        let predefined = try context.fetch(FetchDescriptor<PredefinedTransaction>()).filter { $0.needsCloudUpload }
+        _ = try await upload(predefined, table: "finance_predefined_transactions", token: token, context: context) { item in
+            [
+                "id": item.id.uuidString.lowercased(),
+                "workspace_id": workspace,
+                "description": item.desc ?? NSNull(),
+                "amount": item.amount,
+                "day_of_week": item.dayOfWeek ?? NSNull(),
+                "is_income": item.isIncome,
+                "updated_at": SupabaseTimestamp.format(item.updatedAt),
+                "deleted_at": item.deletedAt.map(SupabaseTimestamp.format) ?? NSNull()
+            ]
+        }
+
+        let quickAdd = try context.fetch(FetchDescriptor<QuickAddTransaction>()).filter { $0.needsCloudUpload }
+        _ = try await upload(quickAdd, table: "finance_quick_add_transactions", token: token, context: context) { item in
+            [
+                "id": item.id.uuidString.lowercased(),
+                "workspace_id": workspace,
+                "description": item.desc ?? NSNull(),
+                "amount": item.amount,
+                "is_income": item.isIncome,
+                "updated_at": SupabaseTimestamp.format(item.updatedAt),
+                "deleted_at": item.deletedAt.map(SupabaseTimestamp.format) ?? NSNull()
+            ]
+        }
+
+        let transactions = try context.fetch(FetchDescriptor<Transaction>()).filter { $0.needsCloudUpload }
+        _ = try await upload(transactions, table: "finance_transactions", token: token, context: context) { item in
+            transactionBody(item)
+        }
+
+        let income = try context.fetch(FetchDescriptor<NetIncomeEntity>()).filter { $0.needsCloudUpload }
+        _ = try await upload(income, table: "finance_net_income", token: token, context: context) { item in
+            [
+                "id": item.id.uuidString.lowercased(),
+                "workspace_id": workspace,
+                "value": item.value,
+                "updated_at": SupabaseTimestamp.format(item.updatedAt),
+                "deleted_at": item.deletedAt.map(SupabaseTimestamp.format) ?? NSNull()
+            ]
+        }
     }
 
     private func upload<Record: FinanceSyncRecord>(
@@ -882,6 +1066,7 @@ final class FinanceCloud: ObservableObject {
 private struct SyncCounts {
     var uploaded = 0
     var downloaded = 0
+    var balanceDelta = 0.0
 }
 
 private struct AuthSession: Decodable {
@@ -1021,6 +1206,9 @@ enum FinanceCloudError: LocalizedError {
     case completionNotDownloaded
     case importNeedsConnection
     case importNotDownloaded
+    case resetNeedsConnection
+    case initializeNeedsConnection
+    case weekChangeNotDownloaded
 
     var errorDescription: String? {
         switch self {
@@ -1040,6 +1228,12 @@ enum FinanceCloudError: LocalizedError {
             return "Importing sessions needs an internet connection."
         case .importNotDownloaded:
             return "The import finished online, but this phone couldn't download it. Pull to refresh."
+        case .resetNeedsConnection:
+            return "Resetting the week needs an internet connection."
+        case .initializeNeedsConnection:
+            return "Initializing the week needs an internet connection."
+        case .weekChangeNotDownloaded:
+            return "The week was updated online, but this phone couldn't download it. Pull to refresh."
         }
     }
 }

@@ -17,6 +17,8 @@ struct NetIncomeTabView: View {
     @State private var showingImportSessions = false
     @State private var selectedDay: String = Weekday.today
     @State private var activeAlert: ActiveAlert?
+    @State private var weekErrorMessage: String?
+    @State private var showWeekError = false
 
     @Query(sort: \Transaction.dayOfWeek, animation: .default)
     private var transactions: [Transaction]
@@ -134,6 +136,11 @@ struct NetIncomeTabView: View {
                     )
                 }
             }
+            .alert("Couldn't Update the Week", isPresented: $showWeekError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(weekErrorMessage ?? "Something went wrong.")
+            }
         }
     }
 
@@ -180,61 +187,45 @@ struct NetIncomeTabView: View {
     }
 
     private func resetAll() {
+        Task { await resetWeekOnline() }
+    }
+
+    private func resetWeekOnline() async {
         do {
-            let existing = try modelContext.fetch(FetchDescriptor<Transaction>())
-            for transaction in existing where transaction.deletedAt == nil {
-                transaction.markDeleted()
-            }
-            netIncomeManager.resetNetIncome()
-            try modelContext.save()
+            try await FinanceCloud.shared.resetFinanceWeek(in: modelContext)
             activeAlert = .success
         } catch {
-            print("Failed to reset: \(error.localizedDescription)")
+            weekErrorMessage = error.localizedDescription
+            showWeekError = true
         }
     }
 
     private func initializeWeek() {
-        resetAll()
-
         do {
-            let descriptor = FetchDescriptor<PredefinedTransaction>(
-                sortBy: [SortDescriptor(\.dayOfWeek)]
-            )
-            let predefinedTransactions = try modelContext.fetch(descriptor)
+            let predefined = try modelContext.fetch(FetchDescriptor<PredefinedTransaction>())
                 .filter { $0.deletedAt == nil }
-
-            if predefinedTransactions.isEmpty {
+            guard !predefined.isEmpty else {
                 activeAlert = .noPredefinedTransactions
-            } else {
-                for predefinedTransaction in predefinedTransactions {
-                    let scheduledDays = predefinedTransaction.repeatsEveryDay
-                        ? Weekday.allNames
-                        : [predefinedTransaction.dayOfWeek ?? Weekday.today]
-
-                    for day in scheduledDays {
-                        let newTransaction = Transaction(
-                            desc: predefinedTransaction.desc,
-                            amount: predefinedTransaction.amount,
-                            dayOfWeek: day,
-                            isCompleted: false,
-                            isIncome: predefinedTransaction.isIncome
-                        )
-                        modelContext.insert(newTransaction)
-
-                        netIncomeManager.adjustNetIncome(
-                            by: predefinedTransaction.amount,
-                            isIncome: predefinedTransaction.isIncome,
-                            isDeletion: false
-                        )
-                    }
-                }
-
-                netIncomeManager.flushPendingSave()
-                try modelContext.save()
-                activeAlert = .success
+                return
             }
         } catch {
-            print("Failed to add predefined transactions: \(error.localizedDescription)")
+            weekErrorMessage = error.localizedDescription
+            showWeekError = true
+            return
+        }
+        Task { await initializeWeekOnline() }
+    }
+
+    private func initializeWeekOnline() async {
+        do {
+            try await FinanceCloud.shared.reinitializeFinanceWeek(
+                unscheduledDay: Weekday.today,
+                in: modelContext
+            )
+            activeAlert = .success
+        } catch {
+            weekErrorMessage = error.localizedDescription
+            showWeekError = true
         }
     }
 }

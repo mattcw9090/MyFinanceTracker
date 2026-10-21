@@ -60,6 +60,75 @@ func transactionBalanceDelta(
         - transactionBalanceContribution(amount: oldAmount, isIncome: oldIsIncome, isDeleted: oldIsDeleted)
 }
 
+enum NetIncomePullAction: Equatable {
+    /// The server balance is newer. Keep it and do not upload a local adjustment.
+    case adoptServer(Double)
+    /// The server balance did not replace the phone's row.
+    case adjustLocal(value: Double, upload: Bool)
+}
+
+/// Transaction downloads must not be added on top of a server balance and then
+/// uploaded back over it. A completion has a zero delta, so the balance stays.
+func netIncomePullAction(
+    localValue: Double,
+    localUpdatedAt: Date,
+    localLastSyncedAt: Date?,
+    serverValue: Double?,
+    serverUpdatedAt: Date?,
+    transactionDelta: Double
+) -> NetIncomePullAction {
+    switch cloudMergeAction(
+        localUpdatedAt: localUpdatedAt,
+        lastSyncedAt: localLastSyncedAt,
+        remoteUpdatedAt: serverUpdatedAt
+    ) {
+    case .applyRemote:
+        return .adoptServer(serverValue ?? localValue)
+    case .leave:
+        if transactionDelta == 0 {
+            return .adjustLocal(value: localValue, upload: false)
+        }
+        return .adjustLocal(value: localValue + transactionDelta, upload: true)
+    case .uploadLocal:
+        return .adjustLocal(value: localValue + transactionDelta, upload: true)
+    }
+}
+
+func shouldUpdateFinanceWeekOnline(isSignedIn: Bool, isOnline: Bool) -> Bool {
+    isSignedIn && isOnline
+}
+
+struct ResetFinanceWeekCall: Equatable {
+    var httpMethod: String
+    var path: String
+}
+
+func resetFinanceWeekCall() -> ResetFinanceWeekCall {
+    ResetFinanceWeekCall(httpMethod: "POST", path: "/rest/v1/rpc/reset_finance_week")
+}
+
+func resetFinanceWeekBody() -> [String: Any] {
+    [:]
+}
+
+struct ReinitializeFinanceWeekCall: Equatable {
+    var httpMethod: String
+    var path: String
+    var unscheduledDay: String
+}
+
+func reinitializeFinanceWeekCall(unscheduledDay: String) -> ReinitializeFinanceWeekCall {
+    ReinitializeFinanceWeekCall(
+        httpMethod: "POST",
+        path: "/rest/v1/rpc/reinitialize_finance_week",
+        unscheduledDay: unscheduledDay
+    )
+}
+
+func reinitializeFinanceWeekBody(_ call: ReinitializeFinanceWeekCall) -> [String: Any] {
+    ["p_unscheduled_day": call.unscheduledDay]
+}
+
 struct CompleteFinanceTransactionCall: Equatable {
     var httpMethod: String
     var path: String

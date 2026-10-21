@@ -478,6 +478,173 @@ struct FinanceSyncTests {
         #expect(importSessionsSuccessMessage(added: 2) == "Added 2 income transactions.")
     }
 
+    @Test func weekResetNeedsAConnectionBeforeAnyRequest() throws {
+        #expect(shouldUpdateFinanceWeekOnline(isSignedIn: false, isOnline: true) == false)
+        #expect(shouldUpdateFinanceWeekOnline(isSignedIn: true, isOnline: false) == false)
+        #expect(shouldUpdateFinanceWeekOnline(isSignedIn: true, isOnline: true))
+        #expect(FinanceCloudError.resetNeedsConnection.errorDescription == "Resetting the week needs an internet connection.")
+        #expect(FinanceCloudError.initializeNeedsConnection.errorDescription == "Initializing the week needs an internet connection.")
+
+        let reset = resetFinanceWeekCall()
+        #expect(reset.httpMethod == "POST")
+        #expect(reset.path == "/rest/v1/rpc/reset_finance_week")
+        let resetJSON = try jsonObject(from: resetFinanceWeekBody())
+        #expect(resetJSON.isEmpty)
+
+        let call = reinitializeFinanceWeekCall(unscheduledDay: "Wednesday")
+        #expect(call.httpMethod == "POST")
+        #expect(call.path == "/rest/v1/rpc/reinitialize_finance_week")
+        #expect(call.unscheduledDay == "Wednesday")
+        let json = try jsonObject(from: reinitializeFinanceWeekBody(call))
+        #expect(json["p_unscheduled_day"] as? String == "Wednesday")
+    }
+
+    @Test func resetPullKeepsTheServerBalance() {
+        let synced = Date(timeIntervalSince1970: 100)
+        let server = Date(timeIntervalSince1970: 200)
+        let removed = transactionBalanceDelta(
+            oldAmount: 150,
+            oldIsIncome: true,
+            oldIsDeleted: false,
+            newAmount: 150,
+            newIsIncome: true,
+            newIsDeleted: true
+        )
+        #expect(removed == -150)
+        let action = netIncomePullAction(
+            localValue: 200,
+            localUpdatedAt: synced,
+            localLastSyncedAt: synced,
+            serverValue: 0,
+            serverUpdatedAt: server,
+            transactionDelta: removed
+        )
+        #expect(action == .adoptServer(0))
+    }
+
+    @Test func initializePullKeepsTheServerBalance() {
+        let synced = Date(timeIntervalSince1970: 100)
+        let server = Date(timeIntervalSince1970: 200)
+        let removed = transactionBalanceDelta(
+            oldAmount: 100,
+            oldIsIncome: true,
+            oldIsDeleted: false,
+            newAmount: 100,
+            newIsIncome: true,
+            newIsDeleted: true
+        )
+        let created = transactionBalanceContribution(amount: 520, isIncome: false, isDeleted: false)
+        #expect(removed + created == -620)
+        let action = netIncomePullAction(
+            localValue: 40,
+            localUpdatedAt: synced,
+            localLastSyncedAt: synced,
+            serverValue: -520,
+            serverUpdatedAt: server,
+            transactionDelta: removed + created
+        )
+        #expect(action == .adoptServer(-520))
+    }
+
+    @Test func secondInitializePullReplacesADriftedBalance() {
+        let synced = Date(timeIntervalSince1970: 100)
+        let server = Date(timeIntervalSince1970: 200)
+        let action = netIncomePullAction(
+            localValue: -500,
+            localUpdatedAt: synced,
+            localLastSyncedAt: synced,
+            serverValue: -520,
+            serverUpdatedAt: server,
+            transactionDelta: 0
+        )
+        #expect(action == .adoptServer(-520))
+    }
+
+    @Test func importPullKeepsTheServerBalance() {
+        let synced = Date(timeIntervalSince1970: 100)
+        let server = Date(timeIntervalSince1970: 200)
+        let added = transactionBalanceContribution(amount: 80, isIncome: true, isDeleted: false)
+        #expect(added == 80)
+        let drifted = netIncomePullAction(
+            localValue: 150,
+            localUpdatedAt: synced,
+            localLastSyncedAt: synced,
+            serverValue: 180,
+            serverUpdatedAt: server,
+            transactionDelta: added
+        )
+        #expect(drifted == .adoptServer(180))
+
+        let matched = netIncomePullAction(
+            localValue: 100,
+            localUpdatedAt: synced,
+            localLastSyncedAt: synced,
+            serverValue: 180,
+            serverUpdatedAt: server,
+            transactionDelta: added
+        )
+        #expect(matched == .adoptServer(180))
+    }
+
+    @Test func tickPullLeavesTheBalanceUntouched() {
+        let stamp = Date(timeIntervalSince1970: 100)
+        let completion = transactionBalanceDelta(
+            oldAmount: 40,
+            oldIsIncome: true,
+            oldIsDeleted: false,
+            newAmount: 40,
+            newIsIncome: true,
+            newIsDeleted: false
+        )
+        #expect(completion == 0)
+        let action = netIncomePullAction(
+            localValue: 150,
+            localUpdatedAt: stamp,
+            localLastSyncedAt: stamp,
+            serverValue: 150,
+            serverUpdatedAt: stamp,
+            transactionDelta: completion
+        )
+        #expect(action == .adjustLocal(value: 150, upload: false))
+    }
+
+    @Test func secondResetPullDoesNotUploadAnUnchangedZero() {
+        let stamp = Date(timeIntervalSince1970: 100)
+        let action = netIncomePullAction(
+            localValue: 0,
+            localUpdatedAt: stamp,
+            localLastSyncedAt: stamp,
+            serverValue: 0,
+            serverUpdatedAt: stamp,
+            transactionDelta: 0
+        )
+        #expect(action == .adjustLocal(value: 0, upload: false))
+    }
+
+    @Test func remoteTransactionWithoutANewerBalanceUploadsTheDelta() {
+        let stamp = Date(timeIntervalSince1970: 100)
+        let added = transactionBalanceContribution(amount: 40, isIncome: true, isDeleted: false)
+        let unchangedRow = netIncomePullAction(
+            localValue: 100,
+            localUpdatedAt: stamp,
+            localLastSyncedAt: stamp,
+            serverValue: 100,
+            serverUpdatedAt: stamp,
+            transactionDelta: added
+        )
+        #expect(unchangedRow == .adjustLocal(value: 140, upload: true))
+
+        let missingRow = netIncomePullAction(
+            localValue: 100,
+            localUpdatedAt: stamp,
+            localLastSyncedAt: stamp,
+            serverValue: nil,
+            serverUpdatedAt: nil,
+            transactionDelta: added
+        )
+        #expect(missingRow == .adjustLocal(value: 140, upload: true))
+    }
+
     private func jsonObject(from body: [String: Any]) throws -> [String: Any] {
         let data = try JSONSerialization.data(withJSONObject: body)
         return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])

@@ -9,3 +9,7 @@ Ticking a transaction is handled by `public.complete_finance_transaction`. Chang
 ## Cloud session import
 
 Importing CoachPlanner sessions is handled by `public.coaching_sessions_for_finance` and `public.import_coaching_sessions_to_finance`. Change that behavior in the Supabase functions, not in the app. The app previews one week, then asks the import function to add sessions that are not already imported.
+
+## Cloud week reset
+
+Resetting the week is `public.reset_finance_week`. Initializing the week is `public.reinitialize_finance_week`. Change that behavior in the Supabase functions, not in the app. The app pushes pending edits, calls the function, then pulls. Initialize sends today's weekday for a predefined row that has no day, and it does not call the function when this phone has no live predefined rows.
