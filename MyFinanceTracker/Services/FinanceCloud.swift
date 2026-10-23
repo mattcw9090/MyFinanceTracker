@@ -2,6 +2,7 @@ import Foundation
 import Network
 import Security
 import SwiftData
+import UIKit
 
 enum FinanceCloudConfiguration {
     static let projectURL = URL(string: "https://bgpjpimhrnmthamzqsgv.supabase.co")!
@@ -28,18 +29,40 @@ final class FinanceCloud: ObservableObject {
     private var accessToken: String?
     private var tokenRefreshTask: Task<String, Error>?
 
+    /// True while a save is writing sync bookkeeping (`lastSyncedAt`). Those saves must not schedule another push.
+    private var ignoringLocalSaves = false
+    private var debounceTask: Task<Void, Never>?
+    private var localBatch = FinanceLocalPushBatch()
+    private var nextWork: FinanceQueuedSync?
+    private var loopState = FinanceSyncLoopState()
+    /// Serializes pushes, pulls, ticks, imports, and week changes so two uploads cannot pass each other.
+    private var drainRunning = false
+    private var drainContext: ModelContext?
+    private var saveObserver: NSObjectProtocol?
+    private let pathMonitor = NWPathMonitor()
+    private var pathKnown = false
+    private var pathIsOnline = false
+    /// Set when the path comes back, including while an attempt is still running.
+    private var retryHeldWhenIdle = false
+    private let backgroundTime = FinanceBackgroundTime()
+
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         savedEmail = defaults.string(forKey: FinanceCloudConfiguration.emailDefaultsKey) ?? ""
         accessToken = keychain.read("access_token")
         isSignedIn = accessToken != nil || keychain.read("refresh_token") != nil
+        startObservingLocalSaves()
+        startConnectivityMonitor()
     }
 
     func signIn(email: String, password: String) async {
         let email = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !isBusy else { return }
+        guard await acquireDrain(timeout: 60) else { return }
         isBusy = true
-        defer { isBusy = false }
+        defer {
+            isBusy = false
+            releaseDrain()
+        }
         statusMessage = nil
         do {
             let session = try await authenticate(email: email, password: password)
@@ -67,6 +90,11 @@ final class FinanceCloud: ObservableObject {
     func signOut() {
         tokenRefreshTask?.cancel()
         tokenRefreshTask = nil
+        debounceTask?.cancel()
+        debounceTask = nil
+        localBatch = FinanceLocalPushBatch()
+        nextWork = nil
+        loopState = FinanceSyncLoopState()
         accessToken = nil
         isSignedIn = false
         statusMessage = nil
@@ -76,25 +104,44 @@ final class FinanceCloud: ObservableObject {
         keychain.delete("refresh_token")
     }
 
-    /// Pushes dirty local rows and applies newer remote rows. Signed-out
-    /// launches do nothing. A failed upload leaves those rows unsynced so the
-    /// next refresh retries them without dropping the local copy.
+    /// Pulls remote rows and pushes anything still dirty. Signed-out calls do
+    /// nothing. If a push is already running, this waits and then pulls.
     func sync(in context: ModelContext) async {
-        guard !isBusy else { return }
         guard isSignedIn else { return }
-        isBusy = true
-        let autosave = context.autosaveEnabled
-        context.autosaveEnabled = false
-        defer {
-            context.autosaveEnabled = autosave
-            isBusy = false
-        }
+        debounceTask?.cancel()
+        debounceTask = nil
+        _ = localBatch.flush()
+        await enqueue(.pullAndPush, context: context)
+    }
 
-        do {
-            try await performSync(in: context)
-            recordSyncResult(nil)
-        } catch {
-            recordSyncResult(error)
+    /// Schedules one upload for the saves that just landed. Repeated calls inside
+    /// the debounce window become a single push. Sync bookkeeping saves are ignored.
+    func noteLocalEdit() {
+        guard !ignoringLocalSaves, isSignedIn else { return }
+        let fireAt = localBatch.change(at: .now)
+        debounceTask?.cancel()
+        debounceTask = Task { [weak self] in
+            let delay = fireAt.timeIntervalSinceNow
+            if delay > 0 {
+                try? await Task.sleep(for: .seconds(delay))
+            }
+            guard !Task.isCancelled, let self else { return }
+            guard self.localBatch.takeIfDue(at: .now) != nil else { return }
+            await self.enqueue(.pushPending, context: nil)
+        }
+    }
+
+    /// Uploads dirty rows before iOS suspends the app. Call this synchronously
+    /// from the scene-phase change so the background task is requested in time.
+    func flushPendingInBackground() {
+        backgroundTime.acquire()
+        debounceTask?.cancel()
+        debounceTask = nil
+        _ = localBatch.flush()
+        Task { [weak self] in
+            guard let self else { return }
+            await self.enqueue(.pushPending, context: nil)
+            self.backgroundTime.end()
         }
     }
 
@@ -108,6 +155,164 @@ final class FinanceCloud: ObservableObject {
         )
         consecutiveUploadFailures = next.consecutiveFailures
         syncNotice = next.notice
+    }
+
+    private func enqueue(_ work: FinanceQueuedSync, context: ModelContext?) async {
+        if let context {
+            drainContext = context
+        }
+        var requested = work
+        if work == .pullAndPush, let held = loopState.held {
+            loopState.held = nil
+            requested = mergedFinanceSync(held, work)
+        } else if work == .pushPending, loopState.held == .pushPending {
+            loopState.held = nil
+        }
+        nextWork = mergedFinanceSync(nextWork, requested)
+        guard await acquireDrain() else { return }
+        defer { releaseDrain() }
+        await drainLoop()
+    }
+
+    private func drainLoop() async {
+        let context = drainContext ?? AppContainer.shared.mainContext
+        while let work = nextWork {
+            nextWork = nil
+            let attempt = await runSync(work, in: context)
+            loopState.pending = nextWork
+            nextWork = nil
+            guard isSignedIn else {
+                loopState.held = nil
+                loopState.pending = nil
+                return
+            }
+            switch financeSyncStepAfterAttempt(work: work, attempt: attempt, state: &loopState) {
+            case .run(let next):
+                nextWork = next
+            case .pause:
+                if retryHeldWhenIdle, pathIsOnline, let held = loopState.held {
+                    retryHeldWhenIdle = false
+                    loopState.held = nil
+                    nextWork = held
+                    continue
+                }
+                retryHeldWhenIdle = false
+                return
+            }
+        }
+    }
+
+    private func runSync(_ work: FinanceQueuedSync, in context: ModelContext) async -> FinanceSyncAttempt {
+        guard isSignedIn else { return .succeeded }
+        let autosave = context.autosaveEnabled
+        context.autosaveEnabled = false
+        defer { context.autosaveEnabled = autosave }
+        do {
+            switch work {
+            case .pushPending:
+                try await performPush(in: context)
+            case .pullAndPush:
+                try await performSync(in: context)
+            }
+            recordSyncResult(nil)
+            return .succeeded
+        } catch {
+            recordSyncResult(error)
+            if isTransientFinanceSyncError(error) {
+                return .offline
+            }
+            return .failed
+        }
+    }
+
+    /// Uploads every dirty row. A clean store does not open a connection.
+    private func performPush(in context: ModelContext) async throws {
+        ignoringLocalSaves = true
+        NetIncomeManager.shared.flushPendingSave()
+        ignoringLocalSaves = false
+        guard try hasPendingUploads(in: context) else { return }
+        if pathKnown, !pathIsOnline {
+            throw URLError(.notConnectedToInternet)
+        }
+        let token = try await validAccessToken()
+        try await pushPendingChanges(token: token, context: context)
+    }
+
+    private func hasPendingUploads(in context: ModelContext) throws -> Bool {
+        if try context.fetch(FetchDescriptor<CashFlowItem>()).contains(where: { $0.needsCloudUpload }) {
+            return true
+        }
+        if try context.fetch(FetchDescriptor<PredefinedTransaction>()).contains(where: { $0.needsCloudUpload }) {
+            return true
+        }
+        if try context.fetch(FetchDescriptor<Transaction>()).contains(where: { $0.needsCloudUpload }) {
+            return true
+        }
+        if try context.fetch(FetchDescriptor<NetIncomeEntity>()).contains(where: { $0.needsCloudUpload }) {
+            return true
+        }
+        return false
+    }
+
+    private func acquireDrain(timeout: TimeInterval? = nil) async -> Bool {
+        let deadline = timeout.map { Date().addingTimeInterval($0) }
+        while true {
+            if !drainRunning && !isBusy {
+                drainRunning = true
+                return true
+            }
+            if let deadline, Date() >= deadline {
+                return false
+            }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
+    private func releaseDrain() {
+        drainRunning = false
+    }
+
+    private func saveSyncMetadata(_ context: ModelContext) throws {
+        ignoringLocalSaves = true
+        defer { ignoringLocalSaves = false }
+        try context.save()
+    }
+
+    private func startObservingLocalSaves() {
+        let context = AppContainer.shared.mainContext
+        saveObserver = NotificationCenter.default.addObserver(
+            forName: ModelContext.didSave,
+            object: context,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.noteLocalEdit()
+            }
+        }
+    }
+
+    private func startConnectivityMonitor() {
+        pathMonitor.pathUpdateHandler = { [weak self] path in
+            let online = path.status == .satisfied
+            Task { @MainActor in
+                guard let self else { return }
+                let wasKnown = self.pathKnown
+                let wasOnline = self.pathIsOnline
+                self.pathKnown = true
+                self.pathIsOnline = online
+                guard online, wasKnown, !wasOnline else { return }
+                await self.retryHeldWork()
+            }
+        }
+        pathMonitor.start(queue: DispatchQueue(label: "MyFinanceTracker.reachability"))
+    }
+
+    private func retryHeldWork() async {
+        retryHeldWhenIdle = true
+        guard isSignedIn, pathIsOnline, let held = loopState.held else { return }
+        retryHeldWhenIdle = false
+        loopState.held = nil
+        await enqueue(held, context: nil)
     }
 
     /// Ticks one transaction in Supabase. Local completion and cash-flow rows
@@ -125,18 +330,14 @@ final class FinanceCloud: ObservableObject {
         }
         guard !transaction.isCompleted, transaction.deletedAt == nil else { return }
 
-        let deadline = Date().addingTimeInterval(60)
-        while isBusy {
-            if Date() >= deadline { throw FinanceCloudError.needsConnection }
-            try await Task.sleep(for: .milliseconds(50))
-        }
-
+        guard await acquireDrain(timeout: 60) else { throw FinanceCloudError.needsConnection }
         isBusy = true
         let autosave = context.autosaveEnabled
         context.autosaveEnabled = false
         defer {
             context.autosaveEnabled = autosave
             isBusy = false
+            releaseDrain()
         }
 
         do {
@@ -175,13 +376,14 @@ final class FinanceCloud: ObservableObject {
     /// written locally until that pull succeeds.
     func importCoachingSessions(weekStart: Date, in context: ModelContext) async throws -> Int {
         try await prepareCoachingImport()
-
+        guard await acquireDrain(timeout: 60) else { throw FinanceCloudError.importNeedsConnection }
         isBusy = true
         let autosave = context.autosaveEnabled
         context.autosaveEnabled = false
         defer {
             context.autosaveEnabled = autosave
             isBusy = false
+            releaseDrain()
         }
 
         let added: Int
@@ -222,13 +424,14 @@ final class FinanceCloud: ObservableObject {
         rpc: (String) async throws -> Void
     ) async throws {
         try await prepareOnlineFinanceChange(failure: failure)
-
+        guard await acquireDrain(timeout: 60) else { throw failure }
         isBusy = true
         let autosave = context.autosaveEnabled
         context.autosaveEnabled = false
         defer {
             context.autosaveEnabled = autosave
             isBusy = false
+            releaseDrain()
         }
 
         do {
@@ -251,22 +454,12 @@ final class FinanceCloud: ObservableObject {
         guard shouldUpdateFinanceWeekOnline(isSignedIn: isSignedIn, isOnline: online) else {
             throw failure
         }
-        let deadline = Date().addingTimeInterval(60)
-        while isBusy {
-            if Date() >= deadline { throw failure }
-            try await Task.sleep(for: .milliseconds(50))
-        }
     }
 
     private func prepareCoachingImport() async throws {
         let online = await Self.networkIsOnline()
         guard shouldImportSessionsOnline(isSignedIn: isSignedIn, isOnline: online) else {
             throw FinanceCloudError.importNeedsConnection
-        }
-        let deadline = Date().addingTimeInterval(60)
-        while isBusy {
-            if Date() >= deadline { throw FinanceCloudError.importNeedsConnection }
-            try await Task.sleep(for: .milliseconds(50))
         }
     }
 
@@ -284,7 +477,12 @@ final class FinanceCloud: ObservableObject {
     }
 
     private func performSync(in context: ModelContext) async throws {
+        ignoringLocalSaves = true
         NetIncomeManager.shared.flushPendingSave()
+        ignoringLocalSaves = false
+        if pathKnown, !pathIsOnline {
+            throw URLError(.notConnectedToInternet)
+        }
         let token = try await validAccessToken()
         try await verifyWorkspaceAccess(token: token)
         _ = try await syncCashFlow(token: token, context: context)
@@ -302,14 +500,14 @@ final class FinanceCloud: ObservableObject {
         let token = try await validAccessToken()
         let stamp = transaction.updatedAt
         let savedAt = try await upsert(
-            table: "finance_transactions",
+            table: FinanceSyncedTable.transactions,
             body: transactionBody(transaction),
             token: token
         )
         guard transaction.updatedAt == stamp else { throw FinanceCloudError.needsConnection }
         transaction.updatedAt = savedAt
         transaction.lastSyncedAt = savedAt
-        try context.save()
+        try saveSyncMetadata(context)
     }
 
     private func invokeCompleteFinanceTransaction(
@@ -411,7 +609,7 @@ final class FinanceCloud: ObservableObject {
 
     private func syncCashFlow(token: String, context: ModelContext) async throws -> SyncCounts {
         let remote = try await fetchAll(
-            table: "finance_cash_flow_items",
+            table: FinanceSyncedTable.cashFlowItems,
             select: "id,name,amount,is_owed_to_me,is_settled,updated_at,deleted_at",
             token: token,
             as: CashFlowCloudRow.self
@@ -456,8 +654,8 @@ final class FinanceCloud: ObservableObject {
             }
         }
         pending.append(contentsOf: local.filter { !remoteIDs.contains($0.id) })
-        try context.save()
-        counts.uploaded += try await upload(pending, table: "finance_cash_flow_items", token: token, context: context) { item in
+        try saveSyncMetadata(context)
+        counts.uploaded += try await upload(pending, table: FinanceSyncedTable.cashFlowItems, token: token, context: context) { item in
             [
                 "id": item.id.uuidString.lowercased(),
                 "workspace_id": FinanceCloudConfiguration.workspaceID.uuidString.lowercased(),
@@ -474,7 +672,7 @@ final class FinanceCloud: ObservableObject {
 
     private func syncPredefined(token: String, context: ModelContext) async throws -> SyncCounts {
         let remote = try await fetchAll(
-            table: "finance_predefined_transactions",
+            table: FinanceSyncedTable.predefinedTransactions,
             select: "id,description,amount,day_of_week,is_income,updated_at,deleted_at",
             token: token,
             as: TemplateCloudRow.self
@@ -519,8 +717,8 @@ final class FinanceCloud: ObservableObject {
             }
         }
         pending.append(contentsOf: local.filter { !remoteIDs.contains($0.id) })
-        try context.save()
-        counts.uploaded += try await upload(pending, table: "finance_predefined_transactions", token: token, context: context) { item in
+        try saveSyncMetadata(context)
+        counts.uploaded += try await upload(pending, table: FinanceSyncedTable.predefinedTransactions, token: token, context: context) { item in
             [
                 "id": item.id.uuidString.lowercased(),
                 "workspace_id": FinanceCloudConfiguration.workspaceID.uuidString.lowercased(),
@@ -537,7 +735,7 @@ final class FinanceCloud: ObservableObject {
 
     private func syncTransactions(token: String, context: ModelContext) async throws -> SyncCounts {
         let remote = try await fetchAll(
-            table: "finance_transactions",
+            table: FinanceSyncedTable.transactions,
             select: "id,description,amount,day_of_week,is_completed,is_income,coaching_session_id,coaching_week_start,updated_at,deleted_at",
             token: token,
             as: TransactionCloudRow.self
@@ -604,8 +802,8 @@ final class FinanceCloud: ObservableObject {
         }
         pending.append(contentsOf: local.filter { !remoteIDs.contains($0.id) })
         counts.balanceDelta = balanceDelta
-        try context.save()
-        counts.uploaded += try await upload(pending, table: "finance_transactions", token: token, context: context) { item in
+        try saveSyncMetadata(context)
+        counts.uploaded += try await upload(pending, table: FinanceSyncedTable.transactions, token: token, context: context) { item in
             transactionBody(item)
         }
         return counts
@@ -628,7 +826,7 @@ final class FinanceCloud: ObservableObject {
         transactionDelta: Double
     ) async throws -> SyncCounts {
         let remote = try await fetchAll(
-            table: "finance_net_income",
+            table: FinanceSyncedTable.netIncome,
             select: "id,value,updated_at,deleted_at",
             token: token,
             as: NetIncomeCloudRow.self
@@ -710,8 +908,8 @@ final class FinanceCloud: ObservableObject {
                 NetIncomeManager.shared.applyRemoteTransactionDelta(value - NetIncomeManager.shared.netIncome)
             }
         }
-        try context.save()
-        counts.uploaded += try await upload(pending, table: "finance_net_income", token: token, context: context) { item in
+        try saveSyncMetadata(context)
+        counts.uploaded += try await upload(pending, table: FinanceSyncedTable.netIncome, token: token, context: context) { item in
             [
                 "id": item.id.uuidString.lowercased(),
                 "workspace_id": FinanceCloudConfiguration.workspaceID.uuidString.lowercased(),
@@ -725,11 +923,13 @@ final class FinanceCloud: ObservableObject {
 
     /// Uploads rows edited on this phone. Does not download or change other local rows.
     private func pushPendingChanges(token: String, context: ModelContext) async throws {
+        ignoringLocalSaves = true
         NetIncomeManager.shared.flushPendingSave()
+        ignoringLocalSaves = false
         let workspace = FinanceCloudConfiguration.workspaceID.uuidString.lowercased()
 
         let cashFlow = try context.fetch(FetchDescriptor<CashFlowItem>()).filter { $0.needsCloudUpload }
-        _ = try await upload(cashFlow, table: "finance_cash_flow_items", token: token, context: context) { item in
+        _ = try await upload(cashFlow, table: FinanceSyncedTable.cashFlowItems, token: token, context: context) { item in
             [
                 "id": item.id.uuidString.lowercased(),
                 "workspace_id": workspace,
@@ -743,7 +943,7 @@ final class FinanceCloud: ObservableObject {
         }
 
         let predefined = try context.fetch(FetchDescriptor<PredefinedTransaction>()).filter { $0.needsCloudUpload }
-        _ = try await upload(predefined, table: "finance_predefined_transactions", token: token, context: context) { item in
+        _ = try await upload(predefined, table: FinanceSyncedTable.predefinedTransactions, token: token, context: context) { item in
             [
                 "id": item.id.uuidString.lowercased(),
                 "workspace_id": workspace,
@@ -757,12 +957,12 @@ final class FinanceCloud: ObservableObject {
         }
 
         let transactions = try context.fetch(FetchDescriptor<Transaction>()).filter { $0.needsCloudUpload }
-        _ = try await upload(transactions, table: "finance_transactions", token: token, context: context) { item in
+        _ = try await upload(transactions, table: FinanceSyncedTable.transactions, token: token, context: context) { item in
             transactionBody(item)
         }
 
         let income = try context.fetch(FetchDescriptor<NetIncomeEntity>()).filter { $0.needsCloudUpload }
-        _ = try await upload(income, table: "finance_net_income", token: token, context: context) { item in
+        _ = try await upload(income, table: FinanceSyncedTable.netIncome, token: token, context: context) { item in
             [
                 "id": item.id.uuidString.lowercased(),
                 "workspace_id": workspace,
@@ -788,7 +988,7 @@ final class FinanceCloud: ObservableObject {
             record.updatedAt = savedAt
             record.lastSyncedAt = savedAt
             uploaded += 1
-            try context.save()
+            try saveSyncMetadata(context)
         }
         return uploaded
     }
@@ -1184,5 +1384,58 @@ private struct FinanceKeychain {
             kSecAttrAccount as String: key
         ]
         SecItemDelete(query as CFDictionary)
+    }
+}
+
+/// Keeps one `UIApplication` background task alive until every in-flight flush has finished.
+private final class FinanceBackgroundTime: @unchecked Sendable {
+    private let lock = NSLock()
+    private var identifier: UIBackgroundTaskIdentifier = .invalid
+    private var depth = 0
+
+    func acquire() {
+        lock.lock()
+        depth += 1
+        let needsTask = identifier == .invalid
+        lock.unlock()
+        guard needsTask else { return }
+
+        let task = UIApplication.shared.beginBackgroundTask(withName: "MyFinanceTracker.pendingPush") { [weak self] in
+            self?.expire()
+        }
+        lock.lock()
+        if identifier == .invalid {
+            identifier = task
+            lock.unlock()
+        } else {
+            lock.unlock()
+            if task != .invalid {
+                UIApplication.shared.endBackgroundTask(task)
+            }
+        }
+    }
+
+    func end() {
+        lock.lock()
+        if depth > 0 {
+            depth -= 1
+        }
+        let task = depth == 0 ? identifier : UIBackgroundTaskIdentifier.invalid
+        if depth == 0 {
+            identifier = .invalid
+        }
+        lock.unlock()
+        guard task != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(task)
+    }
+
+    private func expire() {
+        lock.lock()
+        depth = 0
+        let task = identifier
+        identifier = .invalid
+        lock.unlock()
+        guard task != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(task)
     }
 }

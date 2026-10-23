@@ -84,7 +84,7 @@ struct EditTransactionView: View {
         netIncomeManager.adjustNetIncome(by: newAmount, isIncome: isIncome, isDeletion: false)
 
         do {
-            try modelContext.save()
+            try modelContext.saveLocalChange()
             dismiss()
         } catch {
             alertMessage = "Failed to edit transaction: \(error.localizedDescription)"

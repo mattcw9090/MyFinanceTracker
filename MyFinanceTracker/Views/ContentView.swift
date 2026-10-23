@@ -43,8 +43,14 @@ struct ContentView: View {
             await FinanceCloud.shared.sync(in: modelContext)
         }
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active || phase == .background else { return }
-            Task { await FinanceCloud.shared.sync(in: modelContext) }
+            switch phase {
+            case .active:
+                Task { await FinanceCloud.shared.sync(in: modelContext) }
+            case .inactive, .background:
+                FinanceCloud.shared.flushPendingInBackground()
+            @unknown default:
+                break
+            }
         }
     }
 

@@ -101,7 +101,7 @@ struct CashFlowItemFormView: View {
         target.markLocalEdit()
 
         do {
-            try modelContext.save()
+            try modelContext.saveLocalChange()
             dismiss()
         } catch {
             alertMessage = "Failed to save cash flow item: \(error.localizedDescription)"

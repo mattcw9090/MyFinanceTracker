@@ -135,7 +135,7 @@ struct PredefinedTransactionFormView: View {
         target.markLocalEdit()
 
         do {
-            try modelContext.save()
+            try modelContext.saveLocalChange()
             dismiss()
         } catch {
             alertMessage = "Failed to save predefined transaction: \(error.localizedDescription)"

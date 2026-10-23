@@ -855,6 +855,87 @@ struct FinanceSyncTests {
         #expect(missingRow == .adjustLocal(value: 140, upload: true))
     }
 
+    @Test func localEditsCoalesceIntoOnePush() {
+        var batch = FinanceLocalPushBatch()
+        let start = Date(timeIntervalSince1970: 1_000)
+        let firstFire = batch.change(at: start)
+        let secondFire = batch.change(at: start.addingTimeInterval(0.2))
+        let thirdFire = batch.change(at: start.addingTimeInterval(0.4))
+
+        #expect(firstFire == start.addingTimeInterval(financeLocalPushDebounce))
+        #expect(secondFire > firstFire)
+        #expect(thirdFire == start.addingTimeInterval(0.4 + financeLocalPushDebounce))
+        #expect(batch.pendingChanges == 3)
+        #expect(batch.takeIfDue(at: thirdFire.addingTimeInterval(-0.01)) == nil)
+        #expect(batch.takeIfDue(at: thirdFire) == 3)
+        #expect(batch.takeIfDue(at: thirdFire.addingTimeInterval(5)) == nil)
+        #expect(batch.pendingChanges == 0)
+        #expect(batch.fireAt == nil)
+    }
+
+    @Test func backgroundFlushSkipsTheDebounce() {
+        var batch = FinanceLocalPushBatch()
+        let start = Date(timeIntervalSince1970: 1_000)
+        _ = batch.change(at: start)
+        #expect(batch.flush() == 1)
+        #expect(batch.fireAt == nil)
+        #expect(batch.flush() == nil)
+        #expect(financeSyncWork(for: .inactive) == .pushPending)
+        #expect(financeSyncWork(for: .background) == .pushPending)
+        #expect(financeSyncWork(for: .active) == .pullAndPush)
+    }
+
+    @Test func immediatePushCoversEverySyncedTable() {
+        #expect(FinanceSyncedTable.all == [
+            "finance_cash_flow_items",
+            "finance_predefined_transactions",
+            "finance_transactions",
+            "finance_net_income"
+        ])
+        #expect(mergedFinanceSync(.pushPending, .pushPending) == .pushPending)
+        #expect(mergedFinanceSync(.pushPending, .pullAndPush) == .pullAndPush)
+        #expect(mergedFinanceSync(.pullAndPush, .pushPending) == .pullAndPush)
+    }
+
+    @Test func editAndSoftDeleteBothNeedAnUpload() {
+        let synced = Date(timeIntervalSince1970: 50)
+        let record = FinanceSyncRecordStub(updatedAt: synced, lastSyncedAt: synced)
+        #expect(record.needsCloudUpload == false)
+
+        record.markLocalEdit()
+        #expect(record.needsCloudUpload)
+        #expect(record.deletedAt == nil)
+
+        record.lastSyncedAt = record.updatedAt
+        record.markDeleted()
+        #expect(record.deletedAt != nil)
+        #expect(record.needsCloudUpload)
+    }
+
+    @Test func offlineAndFailedPushesWaitInsteadOfLooping() {
+        var state = FinanceSyncLoopState()
+        let offline = financeSyncStepAfterAttempt(work: .pushPending, attempt: .offline, state: &state)
+        #expect(offline == .pause(held: .pushPending))
+        #expect(state.held == .pushPending)
+
+        var failed = FinanceSyncLoopState()
+        let again = financeSyncStepAfterAttempt(work: .pushPending, attempt: .failed, state: &failed)
+        #expect(again == .pause(held: .pushPending))
+
+        var followed = FinanceSyncLoopState(pending: .pullAndPush)
+        let pull = financeSyncStepAfterAttempt(work: .pushPending, attempt: .offline, state: &followed)
+        #expect(pull == .run(.pullAndPush))
+        #expect(followed.held == nil)
+
+        var done = FinanceSyncLoopState(held: .pushPending)
+        let success = financeSyncStepAfterAttempt(work: .pushPending, attempt: .succeeded, state: &done)
+        #expect(success == .pause(held: nil))
+
+        var keptPull = FinanceSyncLoopState(held: .pullAndPush)
+        let pushed = financeSyncStepAfterAttempt(work: .pushPending, attempt: .succeeded, state: &keptPull)
+        #expect(pushed == .pause(held: .pullAndPush))
+    }
+
     private func jsonObject(from body: [String: Any]) throws -> [String: Any] {
         let data = try JSONSerialization.data(withJSONObject: body)
         return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
@@ -877,5 +958,16 @@ struct FinanceSyncTests {
             hour: hour
         )
         return try #require(calendar.date(from: parts))
+    }
+}
+
+private final class FinanceSyncRecordStub: FinanceSyncRecord {
+    var updatedAt: Date
+    var deletedAt: Date?
+    var lastSyncedAt: Date?
+
+    init(updatedAt: Date, lastSyncedAt: Date?) {
+        self.updatedAt = updatedAt
+        self.lastSyncedAt = lastSyncedAt
     }
 }

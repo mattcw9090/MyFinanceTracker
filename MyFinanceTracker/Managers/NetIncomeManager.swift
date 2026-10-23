@@ -76,6 +76,7 @@ final class NetIncomeManager: ObservableObject {
                 context.insert(NetIncomeEntity(value: netIncome))
             }
             try context.save()
+            FinanceCloud.shared.noteLocalEdit()
         } catch {
             print("Failed to save net income: \(error.localizedDescription)")
         }

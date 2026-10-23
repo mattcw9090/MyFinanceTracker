@@ -161,7 +161,7 @@ struct BulkAddCashFlowItemsView: View {
         }
 
         do {
-            try modelContext.save()
+            try modelContext.saveLocalChange()
             dismiss()
         } catch {
             alertMessage = "Failed to save items: \(error.localizedDescription)"

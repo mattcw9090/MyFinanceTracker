@@ -74,7 +74,7 @@ struct AddTransactionView: View {
         netIncomeManager.adjustNetIncome(by: amount, isIncome: isIncome, isDeletion: false)
 
         do {
-            try modelContext.save()
+            try modelContext.saveLocalChange()
             dismiss()
         } catch {
             alertMessage = "Failed to add transaction: \(error.localizedDescription)"

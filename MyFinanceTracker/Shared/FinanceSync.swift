@@ -230,6 +230,127 @@ enum FinanceSyncPromptKind: Equatable {
 /// Offline blips stay quiet. A prompt appears on the third failure that is not a network drop.
 let financeUploadFailurePromptThreshold = 3
 
+/// How long a burst of local saves waits before one upload. Long enough that a
+/// transaction edit and the balance write that follows it leave together.
+let financeLocalPushDebounce: TimeInterval = 0.75
+
+/// Every table `FinanceCloud` downloads and uploads. An immediate push sends
+/// dirty rows in all of them; it does not wait for the next launch.
+enum FinanceSyncedTable {
+    static let cashFlowItems = "finance_cash_flow_items"
+    static let predefinedTransactions = "finance_predefined_transactions"
+    static let transactions = "finance_transactions"
+    static let netIncome = "finance_net_income"
+    static let all = [cashFlowItems, predefinedTransactions, transactions, netIncome]
+}
+
+enum FinanceQueuedSync: Equatable {
+    /// Upload rows whose `updatedAt` is newer than `lastSyncedAt`. No download.
+    case pushPending
+    /// Download every synced table, then upload anything still dirty.
+    case pullAndPush
+}
+
+enum FinanceScenePhase: Equatable {
+    case active
+    case inactive
+    case background
+}
+
+func financeSyncWork(for phase: FinanceScenePhase) -> FinanceQueuedSync {
+    switch phase {
+    case .active:
+        return .pullAndPush
+    case .inactive, .background:
+        return .pushPending
+    }
+}
+
+func mergedFinanceSync(_ current: FinanceQueuedSync?, _ next: FinanceQueuedSync) -> FinanceQueuedSync {
+    if current == .pullAndPush || next == .pullAndPush { return .pullAndPush }
+    return .pushPending
+}
+
+/// Counts local saves that should leave in one upload.
+struct FinanceLocalPushBatch: Equatable {
+    private(set) var fireAt: Date?
+    private(set) var pendingChanges = 0
+
+    mutating func change(at now: Date, debounce: TimeInterval = financeLocalPushDebounce) -> Date {
+        pendingChanges += 1
+        let fireAt = now.addingTimeInterval(debounce)
+        self.fireAt = fireAt
+        return fireAt
+    }
+
+    /// Returns how many saves are in the batch once `now` has reached the latest fire date.
+    mutating func takeIfDue(at now: Date) -> Int? {
+        guard pendingChanges > 0, let fireAt, now >= fireAt else { return nil }
+        return take()
+    }
+
+    /// Background and inactive transitions upload immediately instead of waiting out the debounce.
+    mutating func flush() -> Int? {
+        guard pendingChanges > 0 else { return nil }
+        return take()
+    }
+
+    private mutating func take() -> Int {
+        let count = pendingChanges
+        pendingChanges = 0
+        fireAt = nil
+        return count
+    }
+}
+
+enum FinanceSyncAttempt: Equatable {
+    case succeeded
+    case offline
+    case failed
+}
+
+struct FinanceSyncLoopState: Equatable {
+    /// Work requested while an attempt was already running.
+    var pending: FinanceQueuedSync?
+    /// Work kept for connectivity or the next foreground, not an immediate retry.
+    var held: FinanceQueuedSync?
+}
+
+enum FinanceSyncStep: Equatable {
+    case run(FinanceQueuedSync)
+    case pause(held: FinanceQueuedSync?)
+}
+
+/// One failed or offline attempt does not start the same upload again. A request
+/// that arrived during the attempt still runs, because that one has not been tried.
+func financeSyncStepAfterAttempt(
+    work: FinanceQueuedSync,
+    attempt: FinanceSyncAttempt,
+    state: inout FinanceSyncLoopState
+) -> FinanceSyncStep {
+    let arrivedDuringAttempt = state.pending
+    state.pending = nil
+
+    switch attempt {
+    case .succeeded:
+        if work == .pullAndPush {
+            state.held = nil
+        } else if state.held == .pushPending {
+            state.held = nil
+        }
+        if let arrivedDuringAttempt {
+            return .run(arrivedDuringAttempt)
+        }
+        return .pause(held: state.held)
+    case .offline, .failed:
+        if let arrivedDuringAttempt {
+            return .run(mergedFinanceSync(work, arrivedDuringAttempt))
+        }
+        state.held = mergedFinanceSync(state.held, work)
+        return .pause(held: state.held)
+    }
+}
+
 func financeSyncPrompt(isSignedIn: Bool, notice: FinanceSyncNotice?) -> FinanceSyncPromptKind? {
     if !isSignedIn || notice == .needsSignIn { return .signIn }
     switch notice {
